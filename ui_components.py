@@ -1618,15 +1618,16 @@ def render_top_bar() -> None:
         render_fragment("topbar_appearance.html", theme_state=html.escape(theme_state)),
         unsafe_allow_html=True,
     )
-    with right:
-        mode_choice = toggle_compat(
-            "☀️ Light mode",
-            value=is_light,
-            key="theme_mode_toggle",
-            help="Switch between light and dark interface modes",
-        )
-    if mode_choice != is_light:
-        st.session_state.ui_theme_light = mode_choice
+    mode_button_label = "☀️ Light mode" if is_light else "🌙 Dark mode"
+    right.markdown('<div class="theme-mode-toggle-anchor"></div>', unsafe_allow_html=True)
+    mode_changed = right.button(
+        mode_button_label,
+        key="theme_mode_button",
+        help="Switch between light and dark interface modes",
+        use_container_width=True,
+    )
+    if mode_changed:
+        st.session_state.ui_theme_light = not is_light
         st.session_state.ui_theme_mode = "Light" if st.session_state.ui_theme_light else "Dark"
         st.rerun()
 
