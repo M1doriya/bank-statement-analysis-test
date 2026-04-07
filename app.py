@@ -5,7 +5,7 @@ import re
 import secrets
 from datetime import datetime
 from io import BytesIO
-from typing import Callable, Dict, List, Tuple, Optional
+from typing import Any, Callable, Dict, List, Tuple, Optional
 
 import pandas as pd
 import streamlit as st
@@ -129,6 +129,7 @@ require_basic_auth()
 render_app_hero()
 render_steps_showcase()
 render_parser_intro()
+st.markdown('<div id="parser-workspace"></div>', unsafe_allow_html=True)
 
 
 # -----------------------------
@@ -949,23 +950,52 @@ def extract_gx_statement_totals(pdf, source_file: str) -> dict:
 # -----------------------------
 # Bank parsers
 # -----------------------------
-PARSERS: Dict[str, Callable[[bytes, str], List[dict]]] = {
-    "Affin Bank": lambda b, f: _parse_with_pdfplumber(parse_affin_bank, b, f),
-    "Agro Bank": lambda b, f: _parse_with_pdfplumber(parse_agro_bank, b, f),
-    "Alliance Bank": lambda b, f: _parse_with_pdfplumber(parse_transactions_alliance, b, f),
-    "Ambank": lambda b, f: _parse_with_pdfplumber(parse_ambank, b, f),
-    "Bank Islam": lambda b, f: _parse_with_pdfplumber(parse_bank_islam, b, f),
-    "Bank Muamalat": lambda b, f: _parse_with_pdfplumber(parse_transactions_bank_muamalat, b, f),
-    "Bank Rakyat": lambda b, f: _parse_with_pdfplumber(parse_bank_rakyat, b, f),
-    "CIMB Bank": lambda b, f: _parse_with_pdfplumber(parse_transactions_cimb, b, f),
-    "Hong Leong": lambda b, f: _parse_with_pdfplumber(parse_hong_leong, b, f),
-    "Maybank": lambda b, f: parse_transactions_maybank(b, f),
-    "MBSB Bank": lambda b, f: _parse_with_pdfplumber(parse_transactions_mbsb, b, f),
-    "Public Bank (PBB)": lambda b, f: _parse_with_pdfplumber(parse_transactions_pbb, b, f),
-    "RHB Bank": lambda b, f: parse_transactions_rhb(b, f),
-    "OCBC Bank": lambda b, f: parse_transactions_ocbc(b, f),
-    "GX Bank": lambda b, f: _parse_with_pdfplumber(parse_transactions_gx_bank, b, f),
-    "UOB Bank": lambda b, f: _parse_with_pdfplumber(parse_transactions_uob, b, f),
+BANK_ENGINES: Dict[str, Dict[str, Any]] = {
+    "Affin Bank": {
+        "parser": lambda b, f: _parse_with_pdfplumber(parse_affin_bank, b, f),
+        "totals_extractor": extract_affin_statement_totals,
+        "totals_state_key": "affin_statement_totals",
+        "transactions_state_key": "affin_file_transactions",
+    },
+    "Agro Bank": {"parser": lambda b, f: _parse_with_pdfplumber(parse_agro_bank, b, f)},
+    "Alliance Bank": {"parser": lambda b, f: _parse_with_pdfplumber(parse_transactions_alliance, b, f)},
+    "Ambank": {
+        "parser": lambda b, f: _parse_with_pdfplumber(parse_ambank, b, f),
+        "totals_extractor": extract_ambank_statement_totals,
+        "totals_state_key": "ambank_statement_totals",
+        "transactions_state_key": "ambank_file_transactions",
+    },
+    "Bank Islam": {
+        "parser": lambda b, f: _parse_with_pdfplumber(parse_bank_islam, b, f),
+        "statement_month_extractor": extract_bank_islam_statement_month,
+        "statement_month_state_key": "bank_islam_file_month",
+    },
+    "Bank Muamalat": {"parser": lambda b, f: _parse_with_pdfplumber(parse_transactions_bank_muamalat, b, f)},
+    "Bank Rakyat": {"parser": lambda b, f: _parse_with_pdfplumber(parse_bank_rakyat, b, f)},
+    "CIMB Bank": {
+        "parser": lambda b, f: _parse_with_pdfplumber(parse_transactions_cimb, b, f),
+        "totals_extractor": extract_cimb_statement_totals,
+        "totals_state_key": "cimb_statement_totals",
+        "transactions_state_key": "cimb_file_transactions",
+    },
+    "Hong Leong": {"parser": lambda b, f: _parse_with_pdfplumber(parse_hong_leong, b, f)},
+    "Maybank": {"parser": lambda b, f: parse_transactions_maybank(b, f)},
+    "MBSB Bank": {"parser": lambda b, f: _parse_with_pdfplumber(parse_transactions_mbsb, b, f)},
+    "Public Bank (PBB)": {"parser": lambda b, f: _parse_with_pdfplumber(parse_transactions_pbb, b, f)},
+    "RHB Bank": {
+        "parser": lambda b, f: parse_transactions_rhb(b, f),
+        "totals_extractor": extract_rhb_statement_totals,
+        "totals_state_key": "rhb_statement_totals",
+        "transactions_state_key": "rhb_file_transactions",
+    },
+    "OCBC Bank": {"parser": lambda b, f: parse_transactions_ocbc(b, f)},
+    "GX Bank": {
+        "parser": lambda b, f: _parse_with_pdfplumber(parse_transactions_gx_bank, b, f),
+        "totals_extractor": extract_gx_statement_totals,
+        "totals_state_key": "gx_statement_totals",
+        "transactions_state_key": "gx_file_transactions",
+    },
+    "UOB Bank": {"parser": lambda b, f: _parse_with_pdfplumber(parse_transactions_uob, b, f)},
 }
 
 
@@ -984,9 +1014,9 @@ with workspace_right:
 
     render_tool_card_header("▣", "Select Bank", "Choose the issuing bank")
     if _supports_streamlit_kwarg(st.selectbox, "label_visibility"):
-        bank_choice = st.selectbox("Select Bank Format", list(PARSERS.keys()), label_visibility="collapsed")
+        bank_choice = st.selectbox("Select Bank Format", list(BANK_ENGINES.keys()), label_visibility="collapsed")
     else:
-        bank_choice = st.selectbox("Select Bank Format", list(PARSERS.keys()))
+        bank_choice = st.selectbox("Select Bank Format", list(BANK_ENGINES.keys()))
     close_tool_card()
 
     render_tool_card_header("⤴", "Upload Statement", "PDF format, one or multiple files")
@@ -1081,7 +1111,8 @@ if uploaded_files and st.session_state.status == "running":
     progress_bar = st.progress(0)
 
     total_files = len(uploaded_files)
-    parser = PARSERS[bank_choice]
+    bank_engine = BANK_ENGINES[bank_choice]
+    parser = bank_engine["parser"]
 
     for file_idx, uploaded_file in enumerate(uploaded_files):
         if st.session_state.status == "stopped":
@@ -1121,46 +1152,22 @@ if uploaded_files and st.session_state.status == "running":
             st.session_state.file_company_name[uploaded_file.name] = company_name
             st.session_state.file_account_no[uploaded_file.name] = account_no
 
-            # Parse transactions (existing logic)
-            if bank_choice == "Affin Bank":
-                with bytes_to_pdfplumber(pdf_bytes) as pdf:
-                    totals = extract_affin_statement_totals(pdf, uploaded_file.name)
-                    st.session_state.affin_statement_totals.append(totals)
-                    tx_raw = parse_affin_bank(pdf, uploaded_file.name) or []
+            totals_extractor = bank_engine.get("totals_extractor")
+            totals_state_key = bank_engine.get("totals_state_key")
+            statement_month_extractor = bank_engine.get("statement_month_extractor")
+            statement_month_state_key = bank_engine.get("statement_month_state_key")
 
-            elif bank_choice == "Ambank":
+            if totals_extractor or statement_month_extractor:
                 with bytes_to_pdfplumber(pdf_bytes) as pdf:
-                    totals = extract_ambank_statement_totals(pdf, uploaded_file.name)
-                    st.session_state.ambank_statement_totals.append(totals)
-                    tx_raw = parse_ambank(pdf, uploaded_file.name) or []
+                    if totals_extractor and totals_state_key:
+                        totals = totals_extractor(pdf, uploaded_file.name)
+                        st.session_state[totals_state_key].append(totals)
+                    if statement_month_extractor and statement_month_state_key:
+                        stmt_month = statement_month_extractor(pdf)
+                        if stmt_month:
+                            st.session_state[statement_month_state_key][uploaded_file.name] = stmt_month
 
-            elif bank_choice == "CIMB Bank":
-                with bytes_to_pdfplumber(pdf_bytes) as pdf:
-                    totals = extract_cimb_statement_totals(pdf, uploaded_file.name)
-                    st.session_state.cimb_statement_totals.append(totals)
-                    tx_raw = parse_transactions_cimb(pdf, uploaded_file.name) or []
-
-            elif bank_choice == "RHB Bank":
-                with bytes_to_pdfplumber(pdf_bytes) as pdf:
-                    totals = extract_rhb_statement_totals(pdf, uploaded_file.name)
-                    st.session_state.rhb_statement_totals.append(totals)
-                tx_raw = parser(pdf_bytes, uploaded_file.name) or []
-
-            elif bank_choice == "GX Bank":
-                with bytes_to_pdfplumber(pdf_bytes) as pdf:
-                    totals = extract_gx_statement_totals(pdf, uploaded_file.name)
-                    st.session_state.gx_statement_totals.append(totals)
-                    tx_raw = parse_transactions_gx_bank(pdf, uploaded_file.name) or []
-
-            elif bank_choice == "Bank Islam":
-                with bytes_to_pdfplumber(pdf_bytes) as pdf:
-                    tx_raw = parse_bank_islam(pdf, uploaded_file.name) or []
-                    stmt_month = extract_bank_islam_statement_month(pdf)
-                    if stmt_month:
-                        st.session_state.bank_islam_file_month[uploaded_file.name] = stmt_month
-
-            else:
-                tx_raw = parser(pdf_bytes, uploaded_file.name) or []
+            tx_raw = parser(pdf_bytes, uploaded_file.name) or []
 
             # Normalize then attach company_name
             tx_norm = normalize_transactions(
@@ -1186,16 +1193,9 @@ if uploaded_files and st.session_state.status == "running":
                         st.session_state.file_company_name[uploaded_file.name] = cand
                         break
 
-            if bank_choice == "Affin Bank":
-                st.session_state.affin_file_transactions[uploaded_file.name] = tx_norm
-            if bank_choice == "Ambank":
-                st.session_state.ambank_file_transactions[uploaded_file.name] = tx_norm
-            if bank_choice == "CIMB Bank":
-                st.session_state.cimb_file_transactions[uploaded_file.name] = tx_norm
-            if bank_choice == "RHB Bank":
-                st.session_state.rhb_file_transactions[uploaded_file.name] = tx_norm
-            if bank_choice == "GX Bank":
-                st.session_state.gx_file_transactions[uploaded_file.name] = tx_norm
+            transactions_state_key = bank_engine.get("transactions_state_key")
+            if transactions_state_key:
+                st.session_state[transactions_state_key][uploaded_file.name] = tx_norm
 
             if tx_norm:
                 st.success(f"✅ Extracted {len(tx_norm)} transactions from {uploaded_file.name}")

@@ -62,3 +62,5 @@ Recommended Railway setup:
 
 - Some statement formats are image-only PDFs. Transaction extraction for those requires OCR support (Tesseract binary) in the host environment.
 - For text-based PDFs, parser extraction runs without OCR dependencies.
+- UI fragments are now stored as reusable HTML partials in `template/fragments/` and rendered through `html_templates.py` so interface updates can be done without touching parser logic.
+- Bank parsing is configured through the `BANK_ENGINES` registry in `app.py`, making it easier to add new banks or attach bank-specific enrichments (statement totals/month extraction).
