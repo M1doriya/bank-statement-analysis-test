@@ -637,6 +637,8 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
             border: 1px solid var(--mode-toggle-border);
             color: var(--mode-toggle-text);
             font-weight: 700;
+            font-size: 0.95rem;
+            line-height: 1.2;
             box-shadow: none;
         }}
 
@@ -649,6 +651,15 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
         div[data-testid="column"]:has(.theme-mode-toggle-anchor) div.stButton > button p {{
             color: inherit !important;
             font-weight: inherit !important;
+            font-size: inherit !important;
+            line-height: inherit !important;
+            opacity: 1 !important;
+            margin: 0 !important;
+        }}
+
+        div[data-testid="column"]:has(.theme-mode-toggle-anchor) div.stButton > button span {{
+            color: inherit !important;
+            opacity: 1 !important;
         }}
 
         .hero-shell {{
