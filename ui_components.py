@@ -3,6 +3,7 @@ import inspect
 from typing import List, Tuple
 
 import streamlit as st
+from html_templates import render_fragment
 
 def inject_global_styles(theme_mode: str = "Dark") -> None:
     is_light = str(theme_mode or "Dark").strip().lower() == "light"
@@ -1596,45 +1597,12 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
 def render_top_bar() -> None:
     st.markdown('<div class="topbar-row-anchor"></div>', unsafe_allow_html=True)
     left, middle, right = columns_compat([1.32, 1.38, 1.30], gap="medium", vertical_alignment="center")
-    left.markdown(
-        """
-        <div class="topbar-shell">
-            <div class="brand-lockup">
-                <div class="brand-mark">✶</div>
-                <div class="brand-copy">
-                    <div class="brand-title">KreditLab</div>
-                    <div class="brand-subtitle">Bank statement parser</div>
-                </div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    middle.markdown(
-        """
-        <div class="topbar-shell">
-            <div class="nav-links">
-                <span>How it works</span>
-                <span>Features</span>
-                <span>FAQ</span>
-                <span class="is-active">Contact</span>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    left.markdown(render_fragment("topbar_brand.html"), unsafe_allow_html=True)
+    middle.markdown(render_fragment("topbar_nav.html"), unsafe_allow_html=True)
     is_light = st.session_state.get("ui_theme_light", False)
     theme_state = "Light mode" if is_light else "Dark mode"
     right.markdown(
-        f"""
-        <div class="topbar-shell appearance-shell">
-            <div class="appearance-shell__copy">
-                <p class="appearance-shell__kicker">Appearance · {html.escape(theme_state)}</p>
-                <p class="appearance-shell__title">Get Started</p>
-                <p class="appearance-shell__hint">Upload a statement and run parser</p>
-            </div>
-        </div>
-        """,
+        render_fragment("topbar_appearance.html", theme_state=html.escape(theme_state)),
         unsafe_allow_html=True,
     )
     mode_button_label = "☀️ Light mode" if is_light else "🌙 Dark mode"
@@ -1651,110 +1619,29 @@ def render_top_bar() -> None:
 
 
 def render_auth_shell() -> None:
-    st.markdown(
-        """
-        <section class="auth-shell">
-            <div class="auth-shell__logo">
-                <span class="section-badge">Secure access</span>
-            </div>
-            <h1>Access the parser workspace</h1>
-            <p class="auth-copy">Sign in to continue to the parser workspace. The visual design is refreshed, while the authentication and parser functionality remain unchanged.</p>
-        </section>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.markdown(render_fragment("auth_shell.html"), unsafe_allow_html=True)
 
 
 def render_app_hero() -> None:
-    st.markdown(
-        """
-        <section class="hero-shell">
-            <span class="hero-badge">Bank statement parser · Powered by KreditLab</span>
-            <h1>Turn Bank Statements Into <span class="accent">Clear Financial Insights</span></h1>
-            <p class="hero-copy">Upload any bank statement PDF and get structured transaction data, summaries, and export-ready reports in seconds.</p>
-            <div class="hero-actions">
-                <span class="hero-btn primary">⇪&nbsp; Get Started — Upload Now</span>
-                <span class="hero-btn ghost">See How It Works →</span>
-            </div>
-            <div class="hero-benefits">
-                <div class="hero-benefit"><strong>Multi-Bank Support</strong>Parse statements from all major Malaysian banks instantly.</div>
-                <div class="hero-benefit"><strong>Secure Processing</strong>Bank-grade handling with privacy-first processing.</div>
-                <div class="hero-benefit"><strong>Instant Insights</strong>Extract key financial patterns and cash-flow trends quickly.</div>
-            </div>
-        </section>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.markdown(render_fragment("app_hero.html"), unsafe_allow_html=True)
 
 
 def render_steps_showcase() -> None:
-    st.markdown(
-        """
-        <section class="steps-shell">
-            <div class="steps-head">
-                <span class="section-badge">How it works</span>
-                <h2>Four steps to financial clarity</h2>
-            </div>
-            <div class="steps-grid">
-                <div class="step-card">
-                    <div class="step-icon">▣</div>
-                    <div class="step-kicker">Step 1</div>
-                    <div class="step-title">Select Your Bank</div>
-                    <div class="step-copy">Choose the bank that issued your statement from the supported list.</div>
-                </div>
-                <div class="step-card">
-                    <div class="step-icon">⤴</div>
-                    <div class="step-kicker">Step 2</div>
-                    <div class="step-title">Upload Statement</div>
-                    <div class="step-copy">Drag and drop or browse your PDF bank statement file.</div>
-                </div>
-                <div class="step-card">
-                    <div class="step-icon">∿</div>
-                    <div class="step-kicker">Step 3</div>
-                    <div class="step-title">Process & Analyse</div>
-                    <div class="step-copy">The engine extracts and structures the transaction data automatically.</div>
-                </div>
-                <div class="step-card">
-                    <div class="step-icon">▥</div>
-                    <div class="step-kicker">Step 4</div>
-                    <div class="step-title">View Results</div>
-                    <div class="step-copy">Inspect transactions, summaries, and export-ready outputs.</div>
-                </div>
-            </div>
-        </section>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.markdown(render_fragment("steps_showcase.html"), unsafe_allow_html=True)
 
 
 def render_parser_intro() -> None:
-    st.markdown(
-        """
-        <div class="parser-intro">
-            <div class="parser-heading">
-                <span class="section-badge">Parser engine</span>
-                <h2>Upload & Parse Your Statement</h2>
-                <p class="parser-copy">Select your bank, upload the PDF statement, and let the parser extract structured financial data into review-ready outputs.</p>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.markdown(render_fragment("parser_intro.html"), unsafe_allow_html=True)
 
 
 def render_tool_card_header(icon: str, title: str, subtitle: str) -> None:
     st.markdown(
-        f"""
-        <div class="tool-card">
-            <div class="tool-card__head">
-                <div class="tool-card__icon">{html.escape(icon)}</div>
-                <div>
-                    <div class="tool-card__title">{html.escape(title)}</div>
-                    <div class="tool-card__copy">{html.escape(subtitle)}</div>
-                </div>
-            </div>
-        </div>
-        """,
+        render_fragment(
+            "tool_card_header.html",
+            icon=html.escape(icon),
+            title=html.escape(title),
+            subtitle=html.escape(subtitle),
+        ),
         unsafe_allow_html=True,
     )
 
