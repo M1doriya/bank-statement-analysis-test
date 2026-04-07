@@ -3,6 +3,7 @@ import inspect
 from typing import List, Tuple
 
 import streamlit as st
+from html_templates import render_fragment
 
 def inject_global_styles(theme_mode: str = "Dark") -> None:
     is_light = str(theme_mode or "Dark").strip().lower() == "light"
@@ -46,12 +47,12 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
             --theme-icon-bg: #f0fdfa;
             --theme-icon-border: rgba(18, 184, 171, 0.24);
             --theme-icon-text: #0d8f85;
-            --mode-toggle-bg: #0f172a;
-            --mode-toggle-text: #f8fafc;
-            --mode-toggle-border: rgba(15, 23, 42, 0.22);
-            --mode-toggle-hover-bg: #111827;
-            --mode-toggle-hover-text: #ffffff;
-            --mode-toggle-hover-border: rgba(15, 23, 42, 0.32);
+            --mode-toggle-bg: #f8fafc;
+            --mode-toggle-text: #0f172a;
+            --mode-toggle-border: rgba(15, 23, 42, 0.16);
+            --mode-toggle-hover-bg: #eef2f7;
+            --mode-toggle-hover-text: #0b1220;
+            --mode-toggle-hover-border: rgba(15, 23, 42, 0.24);
             --progress-bg: #ffffff;
             --progress-border: rgba(15, 23, 42, 0.10);
             --progress-title: #0b1220;
@@ -88,6 +89,9 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
             --badge-text: #0d8f85;
             --display-heading: #0b1220;
             --display-copy: #475569;
+            --hero-ghost-btn-bg: #f8fafc;
+            --hero-ghost-btn-text: #0d8f85;
+            --hero-ghost-btn-border: rgba(15, 23, 42, 0.14);
             --auth-bg: #ffffff;
             --auth-heading: #0b1220;
             --auth-copy: #475569;
@@ -197,6 +201,9 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
             --badge-text: #7ef1e6;
             --display-heading: #eaf9fa;
             --display-copy: #8db4b6;
+            --hero-ghost-btn-bg: rgba(8, 20, 27, 0.36);
+            --hero-ghost-btn-text: #11d5c4;
+            --hero-ghost-btn-border: rgba(17, 213, 196, 0.24);
             --auth-bg: #0d1d27;
             --auth-heading: #f6ffff;
             --auth-copy: #94c4c6;
@@ -440,8 +447,12 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
             font-weight: 700;
         }}
 
-        .nav-links span {{
+        .nav-links span,
+        .nav-links a {{
             white-space: nowrap;
+            color: var(--topbar-muted);
+            text-decoration: none;
+            position: relative;
         }}
 
         .nav-links .is-active {{
@@ -449,7 +460,8 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
             position: relative;
         }}
 
-        .nav-links .is-active::after {{
+        .nav-links .is-active::after,
+        .nav-links a:hover::after {{
             content: "";
             position: absolute;
             left: 50%;
@@ -715,6 +727,7 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
             border: 1px solid var(--tool-border);
             font-weight: 800;
             font-size: 0.95rem;
+            text-decoration: none;
         }}
 
         .hero-btn.primary {{
@@ -724,8 +737,9 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
         }}
 
         .hero-btn.ghost {{
-            background: rgba(8, 20, 27, 0.36);
-            color: var(--accent);
+            background: var(--hero-ghost-btn-bg);
+            color: var(--hero-ghost-btn-text);
+            border-color: var(--hero-ghost-btn-border);
         }}
 
         .hero-benefits {{
@@ -1596,165 +1610,51 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
 def render_top_bar() -> None:
     st.markdown('<div class="topbar-row-anchor"></div>', unsafe_allow_html=True)
     left, middle, right = columns_compat([1.32, 1.38, 1.30], gap="medium", vertical_alignment="center")
-    left.markdown(
-        """
-        <div class="topbar-shell">
-            <div class="brand-lockup">
-                <div class="brand-mark">✶</div>
-                <div class="brand-copy">
-                    <div class="brand-title">KreditLab</div>
-                    <div class="brand-subtitle">Bank statement parser</div>
-                </div>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    middle.markdown(
-        """
-        <div class="topbar-shell">
-            <div class="nav-links">
-                <span>How it works</span>
-                <span>Features</span>
-                <span>FAQ</span>
-                <span class="is-active">Contact</span>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    left.markdown(render_fragment("topbar_brand.html"), unsafe_allow_html=True)
+    middle.markdown(render_fragment("topbar_nav.html"), unsafe_allow_html=True)
     is_light = st.session_state.get("ui_theme_light", False)
     theme_state = "Light mode" if is_light else "Dark mode"
     right.markdown(
-        f"""
-        <div class="topbar-shell appearance-shell">
-            <div class="appearance-shell__copy">
-                <p class="appearance-shell__kicker">Appearance · {html.escape(theme_state)}</p>
-                <p class="appearance-shell__title">Get Started</p>
-                <p class="appearance-shell__hint">Upload a statement and run parser</p>
-            </div>
-        </div>
-        """,
+        render_fragment("topbar_appearance.html", theme_state=html.escape(theme_state)),
         unsafe_allow_html=True,
     )
-    mode_button_label = "☀️ Light mode" if is_light else "🌙 Dark mode"
-    st.markdown('<div class="theme-mode-toggle-anchor"></div>', unsafe_allow_html=True)
-    mode_changed = st.button(
-        mode_button_label,
-        key="theme_mode_button",
-        help="Switch between light and dark interface modes",
-    )
-    if mode_changed:
-        st.session_state.ui_theme_light = not is_light
+    with right:
+        mode_choice = toggle_compat(
+            "☀️ Light mode",
+            value=is_light,
+            key="theme_mode_toggle",
+            help="Switch between light and dark interface modes",
+        )
+    if mode_choice != is_light:
+        st.session_state.ui_theme_light = mode_choice
         st.session_state.ui_theme_mode = "Light" if st.session_state.ui_theme_light else "Dark"
         st.rerun()
 
 
 def render_auth_shell() -> None:
-    st.markdown(
-        """
-        <section class="auth-shell">
-            <div class="auth-shell__logo">
-                <span class="section-badge">Secure access</span>
-            </div>
-            <h1>Access the parser workspace</h1>
-            <p class="auth-copy">Sign in to continue to the parser workspace. The visual design is refreshed, while the authentication and parser functionality remain unchanged.</p>
-        </section>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.markdown(render_fragment("auth_shell.html"), unsafe_allow_html=True)
 
 
 def render_app_hero() -> None:
-    st.markdown(
-        """
-        <section class="hero-shell">
-            <span class="hero-badge">Bank statement parser · Powered by KreditLab</span>
-            <h1>Turn Bank Statements Into <span class="accent">Clear Financial Insights</span></h1>
-            <p class="hero-copy">Upload any bank statement PDF and get structured transaction data, summaries, and export-ready reports in seconds.</p>
-            <div class="hero-actions">
-                <span class="hero-btn primary">⇪&nbsp; Get Started — Upload Now</span>
-                <span class="hero-btn ghost">See How It Works →</span>
-            </div>
-            <div class="hero-benefits">
-                <div class="hero-benefit"><strong>Multi-Bank Support</strong>Parse statements from all major Malaysian banks instantly.</div>
-                <div class="hero-benefit"><strong>Secure Processing</strong>Bank-grade handling with privacy-first processing.</div>
-                <div class="hero-benefit"><strong>Instant Insights</strong>Extract key financial patterns and cash-flow trends quickly.</div>
-            </div>
-        </section>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.markdown(render_fragment("app_hero.html"), unsafe_allow_html=True)
 
 
 def render_steps_showcase() -> None:
-    st.markdown(
-        """
-        <section class="steps-shell">
-            <div class="steps-head">
-                <span class="section-badge">How it works</span>
-                <h2>Four steps to financial clarity</h2>
-            </div>
-            <div class="steps-grid">
-                <div class="step-card">
-                    <div class="step-icon">▣</div>
-                    <div class="step-kicker">Step 1</div>
-                    <div class="step-title">Select Your Bank</div>
-                    <div class="step-copy">Choose the bank that issued your statement from the supported list.</div>
-                </div>
-                <div class="step-card">
-                    <div class="step-icon">⤴</div>
-                    <div class="step-kicker">Step 2</div>
-                    <div class="step-title">Upload Statement</div>
-                    <div class="step-copy">Drag and drop or browse your PDF bank statement file.</div>
-                </div>
-                <div class="step-card">
-                    <div class="step-icon">∿</div>
-                    <div class="step-kicker">Step 3</div>
-                    <div class="step-title">Process & Analyse</div>
-                    <div class="step-copy">The engine extracts and structures the transaction data automatically.</div>
-                </div>
-                <div class="step-card">
-                    <div class="step-icon">▥</div>
-                    <div class="step-kicker">Step 4</div>
-                    <div class="step-title">View Results</div>
-                    <div class="step-copy">Inspect transactions, summaries, and export-ready outputs.</div>
-                </div>
-            </div>
-        </section>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.markdown(render_fragment("steps_showcase.html"), unsafe_allow_html=True)
 
 
 def render_parser_intro() -> None:
-    st.markdown(
-        """
-        <div class="parser-intro">
-            <div class="parser-heading">
-                <span class="section-badge">Parser engine</span>
-                <h2>Upload & Parse Your Statement</h2>
-                <p class="parser-copy">Select your bank, upload the PDF statement, and let the parser extract structured financial data into review-ready outputs.</p>
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    st.markdown(render_fragment("parser_intro.html"), unsafe_allow_html=True)
 
 
 def render_tool_card_header(icon: str, title: str, subtitle: str) -> None:
     st.markdown(
-        f"""
-        <div class="tool-card">
-            <div class="tool-card__head">
-                <div class="tool-card__icon">{html.escape(icon)}</div>
-                <div>
-                    <div class="tool-card__title">{html.escape(title)}</div>
-                    <div class="tool-card__copy">{html.escape(subtitle)}</div>
-                </div>
-            </div>
-        </div>
-        """,
+        render_fragment(
+            "tool_card_header.html",
+            icon=html.escape(icon),
+            title=html.escape(title),
+            subtitle=html.escape(subtitle),
+        ),
         unsafe_allow_html=True,
     )
 
