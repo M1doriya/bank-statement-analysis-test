@@ -135,57 +135,29 @@ st.markdown('<div id="parser-workspace"></div>', unsafe_allow_html=True)
 # -----------------------------
 # Session state init
 # -----------------------------
-if "status" not in st.session_state:
-    st.session_state.status = "idle"
+_SESSION_DEFAULT_FACTORIES = {
+    "status": lambda: "idle",
+    "results": list,
+    "affin_statement_totals": list,
+    "affin_file_transactions": dict,
+    "ambank_statement_totals": list,
+    "ambank_file_transactions": dict,
+    "cimb_statement_totals": list,
+    "cimb_file_transactions": dict,
+    "rhb_statement_totals": list,
+    "rhb_file_transactions": dict,
+    "gx_statement_totals": list,
+    "gx_file_transactions": dict,
+    "bank_islam_file_month": dict,
+    "pdf_password": str,
+    "company_name_override": str,
+    "file_company_name": dict,
+    "file_account_no": dict,
+}
 
-if "results" not in st.session_state:
-    st.session_state.results = []
-
-if "affin_statement_totals" not in st.session_state:
-    st.session_state.affin_statement_totals = []
-
-if "affin_file_transactions" not in st.session_state:
-    st.session_state.affin_file_transactions = {}
-
-if "ambank_statement_totals" not in st.session_state:
-    st.session_state.ambank_statement_totals = []
-
-if "ambank_file_transactions" not in st.session_state:
-    st.session_state.ambank_file_transactions = {}
-
-if "cimb_statement_totals" not in st.session_state:
-    st.session_state.cimb_statement_totals = []
-
-if "cimb_file_transactions" not in st.session_state:
-    st.session_state.cimb_file_transactions = {}
-
-if "rhb_statement_totals" not in st.session_state:
-    st.session_state.rhb_statement_totals = []
-
-if "rhb_file_transactions" not in st.session_state:
-    st.session_state.rhb_file_transactions = {}
-
-if "gx_statement_totals" not in st.session_state:
-    st.session_state.gx_statement_totals = []
-
-if "gx_file_transactions" not in st.session_state:
-    st.session_state.gx_file_transactions = {}
-
-if "bank_islam_file_month" not in st.session_state:
-    st.session_state.bank_islam_file_month = {}
-
-# ✅ password + company name tracking
-if "pdf_password" not in st.session_state:
-    st.session_state.pdf_password = ""
-
-if "company_name_override" not in st.session_state:
-    st.session_state.company_name_override = ""
-
-if "file_company_name" not in st.session_state:
-    st.session_state.file_company_name = {}
-
-if "file_account_no" not in st.session_state:
-    st.session_state.file_account_no = {}
+for _state_key, _factory in _SESSION_DEFAULT_FACTORIES.items():
+    if _state_key not in st.session_state:
+        st.session_state[_state_key] = _factory()
 
 
 _ISO_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
