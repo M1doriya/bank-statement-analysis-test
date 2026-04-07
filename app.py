@@ -129,6 +129,7 @@ require_basic_auth()
 render_app_hero()
 render_steps_showcase()
 render_parser_intro()
+st.markdown('<div id="parser-workspace"></div>', unsafe_allow_html=True)
 
 
 # -----------------------------
