@@ -6,6 +6,7 @@ import pandas as pd
 import streamlit as st
 
 from fraud_parser import parse_top_parties_and_high_value, parse_inter_transactions
+from rules_engine import classify_transaction, get_rules_metadata
 
 
 st.set_page_config(page_title="Fraud Analyzer (JSON Upload)", layout="wide")
@@ -57,6 +58,23 @@ st.success(f"✅ Loaded {len(transactions)} transactions (format: {fmt})")
 df = pd.DataFrame(transactions)
 preferred_cols = ["date", "description", "debit", "credit", "balance", "page", "bank", "source_file"]
 display_cols = [c for c in preferred_cols if c in df.columns] or list(df.columns)
+
+st.sidebar.markdown("---")
+enable_rules = st.sidebar.toggle("Apply v3 rules", value=False)
+if enable_rules:
+    enriched: List[Dict] = []
+    for tx in transactions:
+        row = dict(tx)
+        row.update(classify_transaction(tx))
+        enriched.append(row)
+    transactions = enriched
+    df = pd.DataFrame(transactions)
+    rules_meta = get_rules_metadata()
+    with st.expander("📚 Loaded rules metadata", expanded=False):
+        st.json(rules_meta)
+    for col in ["rule_category_code", "rule_category_name", "rule_schema_field", "rule_match_side"]:
+        if col in df.columns and col not in display_cols:
+            display_cols.append(col)
 
 st.subheader("📄 Transactions (Preview)")
 st.dataframe(df[display_cols], use_container_width=True)
