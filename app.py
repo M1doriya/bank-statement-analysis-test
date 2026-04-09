@@ -67,6 +67,7 @@ from ui_components import (
     toggle_compat,
 )
 from rules_engine import classify_transaction, get_rules_metadata
+from schema_output import build_schema_report, validate_schema_report
 
 
 def _supports_streamlit_kwarg(func, name: str) -> bool:
@@ -1876,38 +1877,31 @@ if st.session_state.results or (bank_choice == "Affin Bank" and st.session_state
 
     df_download = df.copy() if not df.empty else pd.DataFrame([])
 
+    schema_report = build_schema_report(
+        transactions=df_download.to_dict(orient="records"),
+        monthly_summary=monthly_summary,
+        rules_metadata=get_rules_metadata(),
+        apply_rules_v3=apply_rules_v3,
+    )
+    schema_validation_errors = validate_schema_report(schema_report)
+    if schema_validation_errors:
+        st.warning(
+            "⚠️ Schema validation found issues. "
+            f"Showing first {min(len(schema_validation_errors), 5)}: "
+            + " | ".join(schema_validation_errors[:5])
+        )
+
     with col1:
         download_button_compat(
             "📄 Download Transactions (JSON)",
-            json.dumps(df_download.to_dict(orient="records"), indent=4),
+            json.dumps(schema_report, indent=4),
             "transactions.json",
             "application/json",
             use_container_width=True,
         )
 
     with col2:
-        company_names = sorted(
-            {x for x in df_download.get("company_name", pd.Series([], dtype=object)).dropna().astype(str).tolist() if x.strip()}
-        )
-
-        account_nos = sorted(
-            {x for x in df_download.get("account_no", pd.Series([], dtype=object)).dropna().astype(str).tolist() if x.strip()}
-        )
-
-        full_report = {
-            "summary": {
-                "total_transactions": int(len(df_download)),
-                "date_range": f"{date_min} to {date_max}" if date_min and date_max else None,
-                "total_files_processed": total_files_processed,
-                "company_names": company_names,
-                "account_nos": account_nos,
-                "generated_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
-            },
-            "rules": get_rules_metadata(),
-            "rules_applied_to_transactions": apply_rules_v3,
-            "monthly_summary": monthly_summary,
-            "transactions": df_download.to_dict(orient="records"),
-        }
+        full_report = schema_report
 
         download_button_compat(
             "📊 Download Full Report (JSON)",
