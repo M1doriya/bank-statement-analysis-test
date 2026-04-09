@@ -1,0 +1,152 @@
+from __future__ import annotations
+
+import json
+import re
+from functools import lru_cache
+from pathlib import Path
+from typing import Any, Dict, List
+
+from core_utils import safe_float
+
+
+RULES_DIR = Path(__file__).resolve().parent / "rules"
+CLASSIFICATION_RULES_FILE = RULES_DIR / "CLASSIFICATION_RULES_V3.json"
+SYSTEM_PROMPT_FILE = RULES_DIR / "SYSTEM_PROMPT_v3.md"
+SCHEMA_FILE = RULES_DIR / "BANK_ANALYSIS_SCHEMA_v6_3_0.json"
+
+
+def _safe_read_json(path: Path) -> Dict[str, Any]:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+
+
+def _safe_read_text(path: Path) -> str:
+    try:
+        return path.read_text(encoding="utf-8")
+    except Exception:
+        return ""
+
+
+def _priority_rank(priority: Any) -> int:
+    text = str(priority or "").strip().upper()
+    match = re.match(r"P(\d+)", text)
+    if match:
+        return int(match.group(1))
+    return 999
+
+
+def _extract_quoted_tokens(text: str) -> List[str]:
+    if not text:
+        return []
+    out: List[str] = []
+    for token in re.findall(r"'([^']+)'|\"([^\"]+)\"", text):
+        value = (token[0] or token[1] or "").strip()
+        if not value:
+            continue
+        if len(value) < 3:
+            continue
+        out.append(value.upper())
+    return out
+
+
+def _extract_upper_terms(text: str) -> List[str]:
+    if not text:
+        return []
+    out: List[str] = []
+    for piece in re.split(r"[\n,;/]|\\n", text):
+        value = piece.strip().strip("•-*").strip()
+        if not value:
+            continue
+        if any(ch.isalpha() for ch in value):
+            out.append(value.upper())
+    return out
+
+
+@lru_cache(maxsize=1)
+def load_rulebook() -> List[Dict[str, Any]]:
+    payload = _safe_read_json(CLASSIFICATION_RULES_FILE)
+    rows = payload.get("sheets", {}).get("1. Categories", {}).get("rows", []) if isinstance(payload, dict) else []
+
+    rules: List[Dict[str, Any]] = []
+    for row in rows:
+        cat = str(row.get("Cat#", "")).strip().upper()
+        if not re.fullmatch(r"C\d{2}", cat):
+            continue
+
+        side = str(row.get("Side", "")).strip().upper()
+        if side not in {"CR", "DR"}:
+            side = ""
+
+        tokens = []
+        tokens.extend(_extract_quoted_tokens(str(row.get("Keyword Patterns", ""))))
+        tokens.extend(_extract_quoted_tokens(str(row.get("Regex Pattern (Python)", ""))))
+        tokens.extend(_extract_upper_terms(str(row.get("Keyword Patterns", ""))))
+
+        seen = set()
+        normalized_tokens: List[str] = []
+        for token in tokens:
+            t = re.sub(r"\s+", " ", token).strip()
+            if len(t) < 3:
+                continue
+            if t in seen:
+                continue
+            seen.add(t)
+            normalized_tokens.append(t)
+
+        rules.append(
+            {
+                "cat": cat,
+                "category": row.get("Category"),
+                "schema_field": row.get("Schema Field"),
+                "side": side,
+                "priority": row.get("Priority"),
+                "priority_rank": _priority_rank(row.get("Priority")),
+                "row_number": int(row.get("_row_number", 0) or 0),
+                "tokens": normalized_tokens[:60],
+            }
+        )
+
+    return sorted(rules, key=lambda r: (r["priority_rank"], r["row_number"], r["cat"]))
+
+
+def classify_transaction(tx: Dict[str, Any]) -> Dict[str, Any]:
+    description = str(tx.get("description", "") or "").upper()
+    credit = safe_float(tx.get("credit", 0))
+    debit = safe_float(tx.get("debit", 0))
+
+    tx_side = "CR" if credit > 0 else ("DR" if debit > 0 else "")
+    if not description or not tx_side:
+        return {}
+
+    for rule in load_rulebook():
+        rule_side = rule.get("side") or ""
+        if rule_side and rule_side != tx_side:
+            continue
+        tokens = rule.get("tokens", [])
+        if not tokens:
+            continue
+        if any(token in description for token in tokens):
+            return {
+                "rule_category_code": rule.get("cat"),
+                "rule_category_name": rule.get("category"),
+                "rule_schema_field": rule.get("schema_field"),
+                "rule_match_side": tx_side,
+            }
+    return {}
+
+
+@lru_cache(maxsize=1)
+def get_rules_metadata() -> Dict[str, Any]:
+    schema = _safe_read_json(SCHEMA_FILE)
+    prompt = _safe_read_text(SYSTEM_PROMPT_FILE)
+    rulebook = load_rulebook()
+    return {
+        "schema_version": schema.get("properties", {}).get("report_info", {}).get("properties", {}).get("schema_version", {}).get("const"),
+        "rule_count": len(rulebook),
+        "classification_file": str(CLASSIFICATION_RULES_FILE),
+        "schema_file": str(SCHEMA_FILE),
+        "system_prompt_file": str(SYSTEM_PROMPT_FILE),
+        "system_prompt_loaded": bool(prompt.strip()),
+    }

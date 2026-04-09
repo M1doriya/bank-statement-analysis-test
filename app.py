@@ -66,6 +66,7 @@ from ui_components import (
     render_top_bar,
     toggle_compat,
 )
+from rules_engine import classify_transaction, get_rules_metadata
 
 
 def _supports_streamlit_kwarg(func, name: str) -> bool:
@@ -1053,6 +1054,14 @@ with workspace_right:
     st.text_input("Company Name (optional override)", key="company_name_override")
     close_tool_card()
 
+    render_tool_card_header("🧠", "Rules Engine (v3)", "Optional rule-based tagging using files in /rules")
+    apply_rules_v3 = toggle_compat("Apply rules classification to output", key="apply_rules_v3", value=False)
+    if apply_rules_v3:
+        st.caption("Rule tags will be added to the transaction table and export files.")
+        with st.expander("Loaded rules metadata", expanded=False):
+            st.json(get_rules_metadata())
+    close_tool_card()
+
     render_tool_card_header("▥", "Parser Actions", "Start processing, stop an active run, or reset the current workspace")
     col1, col2, col3 = st.columns(3)
     with col1:
@@ -1770,6 +1779,13 @@ if st.session_state.results or (bank_choice == "Affin Bank" and st.session_state
 ):
     df = pd.DataFrame(st.session_state.results) if st.session_state.results else pd.DataFrame()
 
+    apply_rules_v3 = bool(st.session_state.get("apply_rules_v3", False))
+    if apply_rules_v3 and not df.empty:
+        records = df.to_dict(orient="records")
+        for row in records:
+            row.update(classify_transaction(row))
+        df = pd.DataFrame(records)
+
     monthly_summary_raw = calculate_monthly_summary(st.session_state.results)
     monthly_summary = present_monthly_summary_standard(monthly_summary_raw)
 
@@ -1812,6 +1828,10 @@ if st.session_state.results or (bank_choice == "Affin Bank" and st.session_state
             "debit",
             "credit",
             "balance",
+            "rule_category_code",
+            "rule_category_name",
+            "rule_schema_field",
+            "rule_match_side",
             "company_name",
             "account_no",
             "page",
@@ -1883,6 +1903,8 @@ if st.session_state.results or (bank_choice == "Affin Bank" and st.session_state
                 "account_nos": account_nos,
                 "generated_at": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
             },
+            "rules": get_rules_metadata(),
+            "rules_applied_to_transactions": apply_rules_v3,
             "monthly_summary": monthly_summary,
             "transactions": df_download.to_dict(orient="records"),
         }
