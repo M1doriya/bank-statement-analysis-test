@@ -1,0 +1,1252 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "bank-analysis-schema-v6.3.0",
+  "title": "Kredit Lab Statement Intelligence Schema v6.3.0",
+  "description": "Malaysian bank statement analysis engine by Kredit Lab. v6.3.0: Added classification rulebook alignment fields — own_party_cr_count, own_party_dr_count, related_party_cr_count, related_party_dr_count, loan_repayment_count, inward_return_cr (C16), unclassified transaction tracking (unclassified_cr_count/amount, unclassified_dr_count/amount), unclassified_transactions array. Tightened field descriptions per Classification Rules v3. Base: v6.2.2 with reconciliation, FX tracking, parsing metadata, counterparty trends.",
+  "$comment_fx_classification": "FX CLASSIFICATION GUIDE — FX means actual foreign currency conversion (non-MYR to/from MYR). A transaction is FX ONLY when a real currency conversion occurs. TRUE FX indicators: (1) 'TT' or 'TELEGRAPHIC TRANSFER' with foreign source/destination and evidence of currency conversion, (2) Explicit 'FOREX', 'FX CONV', or 'FOREIGN EXCHANGE' in the bank description, (3) SWIFT/international wire transfer references with foreign currency amounts, (4) Foreign beneficiary names with international addresses and non-MYR amounts. NOT FX (must be excluded): (a) RENTAS/JANM domestic government remittances — these are MYR-to-MYR interbank transfers via the RENTAS payment rail, not foreign currency, (b) IBG credits with internal voucher reference codes that contain currency-like prefixes (e.g. GBPV = General/Business Payment Voucher, USDP = internal code, not USD currency), (c) DuitNow/FPX/JomPAY transfers regardless of description content, (d) Any MYR-to-MYR transfer between two Malaysian entities. TRACING METHODOLOGY: Alphabet codes like GBPV, USDP, EURK appearing in reference number fields are almost always internal voucher numbering systems, not currency indicators. To confirm FX, look for: conversion rate mentioned, foreign currency amount stated, 'bought/sold' language, correspondent bank references, or SWIFT codes. DEFAULT RULE: When in doubt, classify as NOT FX. Only tag as FX when there is clear, unambiguous evidence of currency conversion.",
+  "type": "object",
+  "required": [
+    "report_info",
+    "accounts",
+    "monthly_analysis",
+    "consolidated",
+    "top_parties",
+    "large_credits",
+    "own_related_transactions",
+    "loan_transactions",
+    "flags",
+    "observations",
+    "parsing_metadata",
+    "unclassified_transactions"
+  ],
+  "properties": {
+    "report_info": {
+      "type": "object",
+      "description": "Report metadata and company information",
+      "required": [
+        "schema_version",
+        "company_name",
+        "generated_at",
+        "period_start",
+        "period_end",
+        "total_accounts",
+        "total_months",
+        "related_parties"
+      ],
+      "properties": {
+        "schema_version": {
+          "type": "string",
+          "const": "6.3.0"
+        },
+        "company_name": {
+          "type": "string",
+          "description": "Full legal name of the company"
+        },
+        "generated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "period_start": {
+          "type": "string",
+          "format": "date"
+        },
+        "period_end": {
+          "type": "string",
+          "format": "date"
+        },
+        "total_accounts": {
+          "type": "integer"
+        },
+        "total_months": {
+          "type": "integer"
+        },
+        "related_parties": {
+          "type": "array",
+          "description": "Known related parties provided for analysis",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "relationship"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "relationship": {
+                "type": "string",
+                "enum": [
+                  "Director",
+                  "Shareholder",
+                  "Sister Company",
+                  "Subsidiary",
+                  "Parent Company",
+                  "Family Member"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "accounts": {
+      "type": "array",
+      "description": "Bank account details — one entry per account",
+      "items": {
+        "type": "object",
+        "required": [
+          "bank_name",
+          "account_number",
+          "account_holder",
+          "account_type",
+          "is_od",
+          "period_start",
+          "period_end",
+          "opening_balance",
+          "closing_balance",
+          "total_credits",
+          "total_debits",
+          "transaction_count"
+        ],
+        "properties": {
+          "bank_name": {
+            "type": "string"
+          },
+          "account_number": {
+            "type": "string"
+          },
+          "account_holder": {
+            "type": "string"
+          },
+          "account_type": {
+            "type": "string",
+            "enum": [
+              "Current",
+              "Savings",
+              "OD"
+            ]
+          },
+          "is_od": {
+            "type": "boolean"
+          },
+          "od_limit": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "period_start": {
+            "type": "string",
+            "format": "date"
+          },
+          "period_end": {
+            "type": "string",
+            "format": "date"
+          },
+          "opening_balance": {
+            "type": "number"
+          },
+          "closing_balance": {
+            "type": "number"
+          },
+          "total_credits": {
+            "type": "number"
+          },
+          "total_debits": {
+            "type": "number"
+          },
+          "transaction_count": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "monthly_analysis": {
+      "type": "array",
+      "description": "Core monthly cash flow breakdown. One entry per account per month. Allows tracing back to individual bank statements.",
+      "items": {
+        "type": "object",
+        "required": [
+          "month",
+          "account_number",
+          "bank_name",
+          "gross_credits",
+          "gross_debits",
+          "net_credits",
+          "net_debits",
+          "credit_count",
+          "debit_count",
+          "own_party_cr",
+          "own_party_dr",
+          "related_party_cr",
+          "related_party_dr",
+          "reversal_cr",
+          "returned_cheques_inward_count",
+          "returned_cheques_inward_amount",
+          "returned_cheques_outward_count",
+          "returned_cheques_outward_amount",
+          "loan_disbursement_cr",
+          "fd_interest_cr",
+          "round_figure_cr",
+          "high_value_cr",
+          "cash_deposits_count",
+          "cash_deposits_amount",
+          "cash_withdrawals_count",
+          "cash_withdrawals_amount",
+          "cheque_deposits_count",
+          "cheque_deposits_amount",
+          "cheque_issues_count",
+          "cheque_issues_amount",
+          "loan_repayment_dr",
+          "salary_paid",
+          "statutory_epf",
+          "statutory_socso",
+          "statutory_tax",
+          "statutory_hrdf",
+          "eod_lowest",
+          "eod_highest",
+          "eod_average",
+          "opening_balance",
+          "closing_balance",
+          "fx_credit_count",
+          "fx_credit_amount",
+          "fx_debit_count",
+          "fx_debit_amount",
+          "reconciliation_status",
+          "reconciliation_delta",
+          "extraction_gaps",
+          "missing_debit_amount",
+          "missing_credit_amount",
+          "own_party_cr_count",
+          "own_party_dr_count",
+          "related_party_cr_count",
+          "related_party_dr_count",
+          "loan_repayment_count",
+          "inward_return_cr",
+          "unclassified_cr_count",
+          "unclassified_cr_amount",
+          "unclassified_dr_count",
+          "unclassified_dr_amount"
+        ],
+        "properties": {
+          "month": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}$",
+            "description": "Month in YYYY-MM format"
+          },
+          "gross_credits": {
+            "type": "number",
+            "description": "Total credits as per bank statement"
+          },
+          "gross_debits": {
+            "type": "number",
+            "description": "Total debits as per bank statement"
+          },
+          "net_credits": {
+            "type": "number",
+            "description": "Credits AFTER excluding: own_party(C01) + related_party(C03) + reversal(C13) + loan_disbursement(C10) + fd_interest(C12) + inward_return(C16). Formula: gross_credits - own_party_cr - related_party_cr - reversal_cr - loan_disbursement_cr - fd_interest_cr - inward_return_cr"
+          },
+          "net_debits": {
+            "type": "number",
+            "description": "Debits AFTER excluding: own_party + related_party. Formula: gross_debits - own_party_dr - related_party_dr. Note: returned cheques are NOT excluded as they naturally net off in the statement (debit out + credit back = zero)."
+          },
+          "credit_count": {
+            "type": "integer",
+            "description": "Total number of credit transactions"
+          },
+          "debit_count": {
+            "type": "integer",
+            "description": "Total number of debit transactions"
+          },
+          "own_party_cr": {
+            "type": "number",
+            "description": "Credits from own party / inter-account transfers"
+          },
+          "own_party_dr": {
+            "type": "number",
+            "description": "Debits to own party / inter-account transfers"
+          },
+          "related_party_cr": {
+            "type": "number",
+            "description": "Credits from related parties"
+          },
+          "related_party_dr": {
+            "type": "number",
+            "description": "Debits to related parties"
+          },
+          "reversal_cr": {
+            "type": "number",
+            "description": "Reversal credits"
+          },
+          "returned_cheques_inward_count": {
+            "type": "integer",
+            "description": "Inward returned cheques — count"
+          },
+          "returned_cheques_inward_amount": {
+            "type": "number",
+            "description": "Inward returned cheques — total amount"
+          },
+          "returned_cheques_outward_count": {
+            "type": "integer",
+            "description": "Outward returned cheques — count"
+          },
+          "returned_cheques_outward_amount": {
+            "type": "number",
+            "description": "Outward returned cheques — total amount"
+          },
+          "loan_disbursement_cr": {
+            "type": "number",
+            "description": "Loan disbursements including trade finance (credit side)"
+          },
+          "fd_interest_cr": {
+            "type": "number",
+            "description": "FD maturities, sweep-ins, and interest/profit credits"
+          },
+          "round_figure_cr": {
+            "type": "number",
+            "description": "Credit amounts that are multiples of RM10,000"
+          },
+          "high_value_cr": {
+            "type": "number",
+            "description": "Credits exceeding 3x average EOD balance for the month"
+          },
+          "cash_deposits_count": {
+            "type": "integer"
+          },
+          "cash_deposits_amount": {
+            "type": "number"
+          },
+          "cash_withdrawals_count": {
+            "type": "integer"
+          },
+          "cash_withdrawals_amount": {
+            "type": "number"
+          },
+          "cheque_deposits_count": {
+            "type": "integer"
+          },
+          "cheque_deposits_amount": {
+            "type": "number"
+          },
+          "cheque_issues_count": {
+            "type": "integer"
+          },
+          "cheque_issues_amount": {
+            "type": "number"
+          },
+          "loan_repayment_dr": {
+            "type": "number",
+            "description": "Loan/financing repayments (debit side)"
+          },
+          "salary_paid": {
+            "type": "number",
+            "description": "Salary/wage payments detected"
+          },
+          "statutory_epf": {
+            "type": "number",
+            "description": "EPF/KWSP payments detected"
+          },
+          "statutory_socso": {
+            "type": "number",
+            "description": "SOCSO/PERKESO payments detected"
+          },
+          "statutory_tax": {
+            "type": "number",
+            "description": "LHDN/Tax payments detected"
+          },
+          "statutory_hrdf": {
+            "type": "number",
+            "description": "HRDF/PSMB payments detected"
+          },
+          "eod_lowest": {
+            "type": "number",
+            "description": "Lowest end-of-day balance in the month"
+          },
+          "eod_highest": {
+            "type": "number",
+            "description": "Highest end-of-day balance in the month"
+          },
+          "eod_average": {
+            "type": "number",
+            "description": "Average end-of-day balance in the month"
+          },
+          "opening_balance": {
+            "type": "number",
+            "description": "Balance at the start of the month (first day or carried forward from previous month closing)"
+          },
+          "closing_balance": {
+            "type": "number",
+            "description": "Balance at the end of the month (last day closing balance)"
+          },
+          "fx_credit_count": {
+            "type": "integer",
+            "description": "v6.2.2: Number of true foreign currency credit transactions where actual non-MYR to MYR conversion occurred. Includes inward TT with foreign currency, SWIFT credits, and explicit FX conversion credits. EXCLUDES domestic RENTAS/JANM remittances and IBG with internal voucher codes (e.g. GBPV = payment voucher, not GBP currency)."
+          },
+          "fx_credit_amount": {
+            "type": "number",
+            "description": "v6.2.2: Total MYR-equivalent amount of true FX credit transactions (actual currency conversion only)"
+          },
+          "fx_debit_count": {
+            "type": "integer",
+            "description": "v6.2.2: Number of true foreign currency debit transactions where actual MYR to non-MYR conversion occurred. Includes outward TT to foreign beneficiaries in foreign currency, SWIFT debits, and explicit FX conversion debits. EXCLUDES domestic transfers and internal voucher references."
+          },
+          "fx_debit_amount": {
+            "type": "number",
+            "description": "v6.2.2: Total MYR-equivalent amount of true FX debit transactions (actual currency conversion only)"
+          },
+          "fx_currencies": {
+            "type": "array",
+            "description": "v6.2.2: Distinct foreign currencies involved in true FX transactions for this month. Empty array if no FX detected. Only populated when actual currency conversion evidence exists — not from voucher reference codes.",
+            "items": {
+              "type": "string",
+              "description": "ISO 4217 currency code (e.g. USD, SGD, EUR, GBP, IDR, THB)"
+            }
+          },
+          "od_limit": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "OD limit if applicable"
+          },
+          "od_utilization_pct": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "description": "Average utilization as % of OD limit"
+          },
+          "days_overdrawn": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "description": "Number of days account was overdrawn (non-OD accounts)"
+          },
+          "account_number": {
+            "type": "string",
+            "description": "Bank account number for this row"
+          },
+          "bank_name": {
+            "type": "string",
+            "description": "Bank name for this row"
+          },
+          "reconciliation_status": {
+            "type": "string",
+            "enum": [
+              "PASS",
+              "FAIL"
+            ],
+            "description": "v6.2.2: Balance trail reconciliation result. PASS = opening_balance + gross_credits - gross_debits matches closing_balance within RM1.00 tolerance AND no extraction gaps detected. FAIL = extraction gaps found via transaction-by-transaction balance trail analysis."
+          },
+          "reconciliation_delta": {
+            "type": "number",
+            "description": "v6.2.2: closing_balance - (opening_balance + gross_credits - gross_debits). Zero or near-zero means all transactions extracted. Negative = missing debits. Positive = missing credits."
+          },
+          "extraction_gaps": {
+            "type": "integer",
+            "description": "v6.2.2: Number of extraction gaps detected in this month via balance trail. Zero if reconciliation_status is PASS."
+          },
+          "missing_debit_amount": {
+            "type": "number",
+            "description": "v6.2.2: Total amount of unextracted debits detected via balance trail gaps. Zero if no gaps."
+          },
+          "missing_credit_amount": {
+            "type": "number",
+            "description": "v6.2.2: Total amount of unextracted credits detected via balance trail gaps. Zero if no gaps."
+          },
+          "data_quality_note": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "v6.2.2: Human-readable warning if reconciliation failed. Null if PASS. HTML renderer should display this as a visible warning on the month row."
+          },
+          "own_party_cr_count": {
+            "type": "integer",
+            "description": "v6.3.0: Number of own-party credit transactions (C01). Full company name match only."
+          },
+          "own_party_dr_count": {
+            "type": "integer",
+            "description": "v6.3.0: Number of own-party debit transactions (C02). Full company name match only."
+          },
+          "related_party_cr_count": {
+            "type": "integer",
+            "description": "v6.3.0: Number of related-party credit transactions (C03)."
+          },
+          "related_party_dr_count": {
+            "type": "integer",
+            "description": "v6.3.0: Number of related-party debit transactions (C04)."
+          },
+          "loan_repayment_count": {
+            "type": "integer",
+            "description": "v6.3.0: Number of loan repayment transactions (C11). Includes dual-tagged C02+C11."
+          },
+          "inward_return_cr": {
+            "type": "number",
+            "description": "v6.3.0: IBG/GIRO Inward Return credits (C16). Failed outward transfers returning to account. EXCLUDED from net credits per Classification Rules v3."
+          },
+          "unclassified_cr_count": {
+            "type": "integer",
+            "description": "v6.3.0: Number of credit transactions with descriptions too vague/missing to classify. Stays in net credits — NOT excluded."
+          },
+          "unclassified_cr_amount": {
+            "type": "number",
+            "description": "v6.3.0: Total amount of unclassified credit transactions. Stays in net credits."
+          },
+          "unclassified_dr_count": {
+            "type": "integer",
+            "description": "v6.3.0: Number of debit transactions with descriptions too vague/missing to classify. Stays in net debits — NOT excluded."
+          },
+          "unclassified_dr_amount": {
+            "type": "number",
+            "description": "v6.3.0: Total amount of unclassified debit transactions. Stays in net debits."
+          }
+        }
+      }
+    },
+    "consolidated": {
+      "type": "object",
+      "description": "Totals and annualized figures across all months",
+      "required": [
+        "gross_credits",
+        "gross_debits",
+        "net_credits",
+        "net_debits",
+        "annualized_net_credits",
+        "annualized_net_debits",
+        "total_own_party_cr",
+        "total_own_party_dr",
+        "total_related_party_cr",
+        "total_related_party_dr",
+        "total_reversal_cr",
+        "total_returned_cheques_inward",
+        "total_returned_cheques_outward",
+        "total_loan_disbursement_cr",
+        "total_fd_interest_cr",
+        "total_round_figure_cr",
+        "total_high_value_cr",
+        "total_cash_deposits",
+        "total_cash_withdrawals",
+        "total_cheque_deposits",
+        "total_cheque_issues",
+        "total_loan_repayment_dr",
+        "total_salary_paid",
+        "total_statutory_epf",
+        "total_statutory_socso",
+        "total_statutory_tax",
+        "total_statutory_hrdf",
+        "eod_lowest",
+        "eod_highest",
+        "eod_average",
+        "total_fx_credits",
+        "total_fx_debits",
+        "data_completeness",
+        "months_with_gaps",
+        "total_extraction_gaps",
+        "total_missing_debits",
+        "total_missing_credits",
+        "total_inward_return_cr",
+        "total_unclassified_cr",
+        "total_unclassified_dr"
+      ],
+      "properties": {
+        "gross_credits": {
+          "type": "number"
+        },
+        "gross_debits": {
+          "type": "number"
+        },
+        "net_credits": {
+          "type": "number",
+          "description": "Sum of monthly net_credits. Reflects exclusion of C01, C03, C10, C12, C13, C16."
+        },
+        "net_debits": {
+          "type": "number",
+          "description": "Sum of monthly net_debits"
+        },
+        "annualized_net_credits": {
+          "type": "number",
+          "description": "AVERAGE(monthly net_credits) × 12"
+        },
+        "annualized_net_debits": {
+          "type": "number",
+          "description": "AVERAGE(monthly net_debits) × 12"
+        },
+        "total_own_party_cr": {
+          "type": "number"
+        },
+        "total_own_party_dr": {
+          "type": "number"
+        },
+        "total_related_party_cr": {
+          "type": "number"
+        },
+        "total_related_party_dr": {
+          "type": "number"
+        },
+        "total_reversal_cr": {
+          "type": "number"
+        },
+        "total_returned_cheques_inward": {
+          "type": "number"
+        },
+        "total_returned_cheques_outward": {
+          "type": "number"
+        },
+        "total_loan_disbursement_cr": {
+          "type": "number"
+        },
+        "total_fd_interest_cr": {
+          "type": "number"
+        },
+        "total_round_figure_cr": {
+          "type": "number"
+        },
+        "total_high_value_cr": {
+          "type": "number"
+        },
+        "total_cash_deposits": {
+          "type": "number"
+        },
+        "total_cash_withdrawals": {
+          "type": "number"
+        },
+        "total_cheque_deposits": {
+          "type": "number"
+        },
+        "total_cheque_issues": {
+          "type": "number"
+        },
+        "total_loan_repayment_dr": {
+          "type": "number"
+        },
+        "total_salary_paid": {
+          "type": "number"
+        },
+        "total_statutory_epf": {
+          "type": "number"
+        },
+        "total_statutory_socso": {
+          "type": "number"
+        },
+        "total_statutory_tax": {
+          "type": "number"
+        },
+        "total_statutory_hrdf": {
+          "type": "number"
+        },
+        "eod_lowest": {
+          "type": "number",
+          "description": "Lowest EOD balance across all months"
+        },
+        "eod_highest": {
+          "type": "number",
+          "description": "Highest EOD balance across all months"
+        },
+        "eod_average": {
+          "type": "number",
+          "description": "Average of monthly EOD averages"
+        },
+        "total_fx_credits": {
+          "type": "number",
+          "description": "v6.2.2: Sum of fx_credit_amount across all months. Only counts true FX where actual foreign currency conversion occurred."
+        },
+        "total_fx_debits": {
+          "type": "number",
+          "description": "v6.2.2: Sum of fx_debit_amount across all months. Only counts true FX where actual foreign currency conversion occurred."
+        },
+        "fx_credit_pct": {
+          "type": "number",
+          "description": "v6.2.2: total_fx_credits as % of gross_credits. Cross-sell signal for trade/FX services. Zero if no true FX transactions exist."
+        },
+        "fx_debit_pct": {
+          "type": "number",
+          "description": "v6.2.2: total_fx_debits as % of gross_debits. Zero if no true FX transactions exist."
+        },
+        "fx_currencies_all": {
+          "type": "array",
+          "description": "v6.2.2: Distinct foreign currencies involved in true FX transactions across the entire period. Empty if no FX detected.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "data_completeness": {
+          "type": "string",
+          "enum": [
+            "COMPLETE",
+            "INCOMPLETE"
+          ],
+          "description": "v6.2.2: COMPLETE if all months pass balance trail reconciliation. INCOMPLETE if any month has extraction gaps. When INCOMPLETE, HTML renderer must show a top-of-report warning banner."
+        },
+        "months_with_gaps": {
+          "type": "integer",
+          "description": "v6.2.2: Number of months where extraction gaps were detected. Zero if data_completeness is COMPLETE."
+        },
+        "total_extraction_gaps": {
+          "type": "integer",
+          "description": "v6.2.2: Total number of individual extraction gaps across all months."
+        },
+        "total_missing_debits": {
+          "type": "number",
+          "description": "v6.2.2: Sum of all missing_debit_amount across months. When > 0, gross_debits and net_debits are understated by at least this amount."
+        },
+        "total_missing_credits": {
+          "type": "number",
+          "description": "v6.2.2: Sum of all missing_credit_amount across months. When > 0, gross_credits and net_credits are understated by at least this amount."
+        },
+        "data_quality_warning": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "v6.2.2: Human-readable warning for HTML top-of-report banner. Null if COMPLETE. Must state which figures are affected and by how much."
+        },
+        "total_inward_return_cr": {
+          "type": "number",
+          "description": "v6.3.0: Sum of inward_return_cr (C16) across all months."
+        },
+        "total_unclassified_cr": {
+          "type": "number",
+          "description": "v6.3.0: Sum of unclassified_cr_amount across all months."
+        },
+        "total_unclassified_dr": {
+          "type": "number",
+          "description": "v6.3.0: Sum of unclassified_dr_amount across all months."
+        }
+      }
+    },
+    "top_parties": {
+      "type": "object",
+      "description": "Top 5 payers and top 5 payees by total amount, with month-over-month trends (v6.2.2)",
+      "required": [
+        "top_payers",
+        "top_payees"
+      ],
+      "properties": {
+        "top_payers": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/party"
+          }
+        },
+        "top_payees": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "$ref": "#/$defs/party"
+          }
+        }
+      }
+    },
+    "large_credits": {
+      "type": "array",
+      "description": "All credit transactions >= RM100,000",
+      "items": {
+        "$ref": "#/$defs/transaction_entry"
+      }
+    },
+    "own_related_transactions": {
+      "type": "object",
+      "description": "All own-party and related-party transactions listed",
+      "required": [
+        "summary",
+        "transactions"
+      ],
+      "properties": {
+        "summary": {
+          "type": "object",
+          "required": [
+            "own_party_cr",
+            "own_party_dr",
+            "related_party_cr",
+            "related_party_dr"
+          ],
+          "properties": {
+            "own_party_cr": {
+              "type": "number"
+            },
+            "own_party_dr": {
+              "type": "number"
+            },
+            "related_party_cr": {
+              "type": "number"
+            },
+            "related_party_dr": {
+              "type": "number"
+            },
+            "own_party_cr_pct": {
+              "type": "number",
+              "description": "% of gross credits"
+            },
+            "own_party_dr_pct": {
+              "type": "number",
+              "description": "% of gross debits"
+            },
+            "related_party_cr_pct": {
+              "type": "number",
+              "description": "% of gross credits"
+            },
+            "related_party_dr_pct": {
+              "type": "number",
+              "description": "% of gross debits"
+            }
+          }
+        },
+        "transactions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "date",
+              "description",
+              "amount",
+              "type",
+              "party_type"
+            ],
+            "properties": {
+              "date": {
+                "type": "string",
+                "format": "date"
+              },
+              "description": {
+                "type": "string"
+              },
+              "amount": {
+                "type": "number"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "CREDIT",
+                  "DEBIT"
+                ]
+              },
+              "party_type": {
+                "type": "string",
+                "enum": [
+                  "OWN",
+                  "RELATED"
+                ]
+              },
+              "party_name": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "loan_transactions": {
+      "type": "object",
+      "description": "Loan disbursements and repayments",
+      "required": [
+        "disbursements",
+        "repayments"
+      ],
+      "properties": {
+        "disbursements": {
+          "type": "array",
+          "description": "Loan/trade finance disbursements (credits)",
+          "items": {
+            "$ref": "#/$defs/transaction_entry"
+          }
+        },
+        "repayments": {
+          "type": "array",
+          "description": "Loan/financing repayments (debits)",
+          "items": {
+            "$ref": "#/$defs/transaction_entry"
+          }
+        }
+      }
+    },
+    "flags": {
+      "type": "object",
+      "description": "Risk signals — Y/N detection flags for credit intelligence and fraud indicators, including Malaysian-specific checks",
+      "required": [
+        "indicators"
+      ],
+      "properties": {
+        "indicators": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "name",
+              "detected",
+              "remarks"
+            ],
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "name": {
+                "type": "string"
+              },
+              "detected": {
+                "type": "boolean"
+              },
+              "remarks": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "observations": {
+      "type": "object",
+      "description": "Brief plain-language observations — max 5 each",
+      "required": [
+        "positive",
+        "concerns"
+      ],
+      "properties": {
+        "positive": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "type": "string"
+          }
+        },
+        "concerns": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "parsing_metadata": {
+      "type": "object",
+      "description": "v6.2.2: Parsing quality metrics. Provides proof of extraction accuracy via balance reconciliation and transaction counts. Alliance Bank KPI: ≥95% transactions parsed & normalized.",
+      "required": [
+        "overall_success_rate",
+        "total_transactions_extracted",
+        "total_balance_checks",
+        "total_balance_checks_passed",
+        "account_month_checks"
+      ],
+      "properties": {
+        "overall_success_rate": {
+          "type": "number",
+          "description": "Overall parsing quality score as percentage (0-100). Computed as: (total_balance_checks_passed / total_balance_checks) × 100. A balance check passes when abs(opening_balance + gross_credits - gross_debits - closing_balance) <= tolerance (RM1.00 default for rounding)."
+        },
+        "total_transactions_extracted": {
+          "type": "integer",
+          "description": "Total number of transactions successfully extracted across all accounts and months"
+        },
+        "total_balance_checks": {
+          "type": "integer",
+          "description": "Total number of account-month combinations checked"
+        },
+        "total_balance_checks_passed": {
+          "type": "integer",
+          "description": "Number of account-month combinations where balance reconciliation passed"
+        },
+        "account_month_checks": {
+          "type": "array",
+          "description": "Per account-month reconciliation detail. One entry per account per month — mirrors monthly_analysis granularity.",
+          "items": {
+            "type": "object",
+            "required": [
+              "month",
+              "account_number",
+              "bank_name",
+              "opening_balance",
+              "closing_balance",
+              "gross_credits",
+              "gross_debits",
+              "expected_closing",
+              "reconciliation_delta",
+              "passed",
+              "transactions_extracted"
+            ],
+            "properties": {
+              "month": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}$"
+              },
+              "account_number": {
+                "type": "string"
+              },
+              "bank_name": {
+                "type": "string"
+              },
+              "opening_balance": {
+                "type": "number",
+                "description": "Opening balance for this account-month"
+              },
+              "closing_balance": {
+                "type": "number",
+                "description": "Actual closing balance from the statement"
+              },
+              "gross_credits": {
+                "type": "number",
+                "description": "Sum of all extracted credit transactions"
+              },
+              "gross_debits": {
+                "type": "number",
+                "description": "Sum of all extracted debit transactions"
+              },
+              "expected_closing": {
+                "type": "number",
+                "description": "Computed closing: opening_balance + gross_credits - gross_debits"
+              },
+              "reconciliation_delta": {
+                "type": "number",
+                "description": "closing_balance - expected_closing. Zero or near-zero means parsing is complete. Positive = missed debits or extra credits. Negative = missed credits or extra debits."
+              },
+              "passed": {
+                "type": "boolean",
+                "description": "True if abs(reconciliation_delta) <= tolerance (RM1.00)"
+              },
+              "transactions_extracted": {
+                "type": "integer",
+                "description": "Number of transactions extracted for this account-month"
+              },
+              "notes": {
+                "type": "string",
+                "description": "Optional explanation if reconciliation failed (e.g., 'Opening balance unavailable — first month of statement', 'Interest charge not in transaction list')"
+              }
+            }
+          }
+        },
+        "extraction_gaps": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "description": "v6.2.2: Detailed list of every extraction gap detected via balance trail. Null if no gaps. Each gap includes exact location (date, page, source PDF), the last good transaction, the next transaction after the gap, and the missing amount. Used by HTML renderer to show gap detail panels.",
+          "items": {
+            "type": "object",
+            "required": [
+              "month",
+              "date",
+              "page",
+              "missing_type",
+              "missing_amount",
+              "balance_before_gap",
+              "balance_after_gap"
+            ],
+            "properties": {
+              "month": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}$"
+              },
+              "date": {
+                "type": "string",
+                "format": "date",
+                "description": "Date of the transaction immediately after the gap"
+              },
+              "page": {
+                "type": "integer",
+                "description": "PDF page number where the gap occurs"
+              },
+              "source_file": {
+                "type": "string",
+                "description": "Source PDF filename"
+              },
+              "missing_type": {
+                "type": "string",
+                "enum": [
+                  "DEBIT",
+                  "CREDIT"
+                ],
+                "description": "Whether the missing transactions are debits or credits"
+              },
+              "missing_amount": {
+                "type": "number",
+                "description": "Total amount of missing transactions at this gap point"
+              },
+              "balance_before_gap": {
+                "type": "number",
+                "description": "Statement balance of the last successfully extracted transaction before the gap"
+              },
+              "balance_after_gap": {
+                "type": "number",
+                "description": "Statement balance of the first transaction after the gap"
+              },
+              "prev_description": {
+                "type": "string",
+                "description": "Description of last good transaction before gap"
+              },
+              "next_description": {
+                "type": "string",
+                "description": "Description of first transaction after gap"
+              }
+            }
+          }
+        }
+      }
+    },
+    "unclassified_transactions": {
+      "type": "array",
+      "description": "v6.3.0: Individual unclassified transactions listed when single transaction exceeds threshold (default RM10,000, user-configurable). Stays in net credits/debits — NOT excluded. Empty array if none exceed threshold.",
+      "items": {
+        "type": "object",
+        "required": [
+          "date",
+          "description",
+          "amount",
+          "type",
+          "account_number"
+        ],
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date"
+          },
+          "description": {
+            "type": "string",
+            "description": "Raw transaction description as extracted from bank statement"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "CREDIT",
+              "DEBIT"
+            ]
+          },
+          "account_number": {
+            "type": "string"
+          },
+          "bank_name": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Why this transaction is unclassified (e.g. \"No description\", \"Description too vague\")"
+          }
+        }
+      }
+    },
+    "classification_config": {
+      "type": "object",
+      "description": "v6.3.0: Runtime classification parameters. Documents thresholds and entity lists used for this analysis run.",
+      "properties": {
+        "rulebook_version": {
+          "type": "string",
+          "description": "Classification rules version used (e.g. \"3.0.0\")"
+        },
+        "large_credit_threshold": {
+          "type": "number",
+          "description": "Threshold for C23 large credit listing. Default 100000."
+        },
+        "unclassified_listing_threshold": {
+          "type": "number",
+          "description": "Threshold for individual unclassified transaction listing. Default 10000."
+        },
+        "known_factoring_entities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Factoring companies used for C10 classification."
+        },
+        "execution_mode": {
+          "type": "string",
+          "enum": [
+            "FULL_AI",
+            "OPTIMISED_AI",
+            "FULL_CODE"
+          ],
+          "description": "Which execution mode was used for this analysis run."
+        }
+      }
+    }
+  },
+  "$defs": {
+    "party": {
+      "type": "object",
+      "description": "v6.2.2: Added monthly_breakdown for month-over-month trend visibility per counterparty",
+      "required": [
+        "rank",
+        "party_name",
+        "total_amount",
+        "transaction_count",
+        "is_related_party",
+        "monthly_breakdown"
+      ],
+      "properties": {
+        "rank": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5
+        },
+        "party_name": {
+          "type": "string"
+        },
+        "total_amount": {
+          "type": "number"
+        },
+        "transaction_count": {
+          "type": "integer"
+        },
+        "is_related_party": {
+          "type": "boolean"
+        },
+        "monthly_breakdown": {
+          "type": "array",
+          "description": "v6.2.2: Per-month transaction volume for this counterparty. Enables MoM trend analysis — spot growing/declining customers/suppliers, seasonal patterns, and concentration risk over time.",
+          "items": {
+            "type": "object",
+            "required": [
+              "month",
+              "amount",
+              "count"
+            ],
+            "properties": {
+              "month": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}$",
+                "description": "Month in YYYY-MM format"
+              },
+              "amount": {
+                "type": "number",
+                "description": "Total transaction amount with this counterparty for the month"
+              },
+              "count": {
+                "type": "integer",
+                "description": "Number of transactions with this counterparty for the month"
+              }
+            }
+          }
+        }
+      }
+    },
+    "transaction_entry": {
+      "type": "object",
+      "required": [
+        "date",
+        "description",
+        "amount"
+      ],
+      "properties": {
+        "date": {
+          "type": "string",
+          "format": "date"
+        },
+        "description": {
+          "type": "string"
+        },
+        "amount": {
+          "type": "number"
+        },
+        "category": {
+          "type": "string"
+        },
+        "balance": {
+          "type": "number"
+        }
+      }
+    }
+  }
+}
