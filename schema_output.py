@@ -423,6 +423,30 @@ def build_schema_report(
         for field_name in monthly_float_fields:
             m[field_name] = round(float(safe_float(m.get(field_name, 0))), 2)
 
+        # Align with BANK_ANALYSIS_SCHEMA_v6.3.0 formulas.
+        m["net_credits"] = round(
+            max(
+                safe_float(m.get("gross_credits", 0))
+                - safe_float(m.get("own_party_cr", 0))
+                - safe_float(m.get("related_party_cr", 0))
+                - safe_float(m.get("reversal_cr", 0))
+                - safe_float(m.get("loan_disbursement_cr", 0))
+                - safe_float(m.get("fd_interest_cr", 0))
+                - safe_float(m.get("inward_return_cr", 0)),
+                0,
+            ),
+            2,
+        )
+        m["net_debits"] = round(
+            max(
+                safe_float(m.get("gross_debits", 0))
+                - safe_float(m.get("own_party_dr", 0))
+                - safe_float(m.get("related_party_dr", 0)),
+                0,
+            ),
+            2,
+        )
+
     report = {
         "report_info": {
             "schema_version": schema_version,
@@ -439,10 +463,10 @@ def build_schema_report(
         "consolidated": {
             "gross_credits": gross_credits,
             "gross_debits": gross_debits,
-            "net_credits": round(max(gross_credits - gross_debits, 0), 2),
-            "net_debits": round(max(gross_debits - gross_credits, 0), 2),
-            "annualized_net_credits": round(max(gross_credits - gross_debits, 0) * 12, 2),
-            "annualized_net_debits": round(max(gross_debits - gross_credits, 0) * 12, 2),
+            "net_credits": round(float(sum(x["net_credits"] for x in monthly_analysis)), 2),
+            "net_debits": round(float(sum(x["net_debits"] for x in monthly_analysis)), 2),
+            "annualized_net_credits": round(float(sum(x["net_credits"] for x in monthly_analysis)) * 12, 2),
+            "annualized_net_debits": round(float(sum(x["net_debits"] for x in monthly_analysis)) * 12, 2),
             "total_own_party_cr": round(float(sum(x["own_party_cr"] for x in monthly_analysis)), 2),
             "total_own_party_dr": round(float(sum(x["own_party_dr"] for x in monthly_analysis)), 2),
             "total_related_party_cr": round(float(sum(x["related_party_cr"] for x in monthly_analysis)), 2),
