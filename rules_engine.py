@@ -14,6 +14,49 @@ CLASSIFICATION_RULES_FILE = RULES_DIR / "CLASSIFICATION_RULES_V3.json"
 SYSTEM_PROMPT_FILE = RULES_DIR / "SYSTEM_PROMPT_v3.md"
 SCHEMA_FILE = RULES_DIR / "BANK_ANALYSIS_SCHEMA_v6_3_0.json"
 
+_TRANSFER_KEYWORDS = (
+    "IBG CREDIT",
+    "DUITNOW TO ACCOUNT",
+    "TRANSFER TO A/C",
+    "I-FUNDS TR FROM",
+    "TR IBG",
+    "TR TO C/A",
+    "TRANSFER FR A/C",
+)
+_SALARY_HINTS = (
+    "SALARY",
+    "GAJI",
+    "STAFF SALARY",
+    "STAFF INCENTIVE",
+    "STAFF OVERTIME",
+    "STAFF BONUS",
+    "STAFF ADVANCE",
+    "EXTRA SALARY",
+    "GUARD SALARY",
+)
+_ENTITY_STOPWORDS = {
+    "SDN",
+    "BHD",
+    "BERHAD",
+    "LTD",
+    "LIMITED",
+    "CO",
+    "COMPANY",
+    "INC",
+    "PLC",
+    "PLT",
+    "PT",
+    "PTY",
+    "AND",
+    "THE",
+    "ENTERPRISE",
+    "ENTERPRISES",
+    "TRADING",
+    "SERVICES",
+    "SERVICE",
+    "M",
+}
+
 
 def _safe_read_json(path: Path) -> Dict[str, Any]:
     try:
@@ -122,6 +165,99 @@ def _description_contains_keyword(description: str, token: str) -> bool:
     return token in description
 
 
+def _normalize_entity_name(value: Any) -> str:
+    text = str(value or "").upper()
+    text = re.sub(r"[^A-Z0-9 ]+", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    if not text:
+        return ""
+    parts = [p for p in text.split() if p and p not in _ENTITY_STOPWORDS]
+    return " ".join(parts)
+
+
+def _extract_counterparty_name(description: str) -> str:
+    if not description:
+        return ""
+    head = description.split("*")[0]
+    head = re.split(r"\b(?:REF|REMARK|RM\s*\d|ID\d|ACC(?:OUNT)?\s*NO|A/C\s*NO)\b", head)[0]
+
+    patterns = [
+        r"(?:IBG CREDIT|DUITNOW TO ACCOUNT|TRANSFER TO A/C|I-FUNDS TR FROM)\s+([A-Z0-9 &./'-]{3,})",
+        r"(?:TR IBG|TR TO C/A|TRANSFER FR A/C)\s+([A-Z0-9 &./'-]{3,})",
+    ]
+    for pat in patterns:
+        m = re.search(pat, head)
+        if m:
+            candidate = m.group(1).strip(" -:;,.\t")
+            candidate = re.sub(r"\s+", " ", candidate)
+            return candidate[:120]
+
+    return ""
+
+
+def _names_match_strict(left: str, right: str) -> bool:
+    left_n = _normalize_entity_name(left)
+    right_n = _normalize_entity_name(right)
+    if not left_n or not right_n:
+        return False
+    if left_n == right_n:
+        return True
+
+    # Allow conservative truncation tolerance for long legal names while
+    # preventing short-root false positives (e.g., DMC TRAVEL vs DMC CONSTRUCTION).
+    if len(left_n) >= 12 and len(right_n) >= 12:
+        return left_n.startswith(right_n) or right_n.startswith(left_n)
+    return False
+
+
+def _extract_related_party_names(tx: Dict[str, Any]) -> List[str]:
+    names: List[str] = []
+    raw = tx.get("related_parties")
+    if isinstance(raw, list):
+        for item in raw:
+            if isinstance(item, dict):
+                val = item.get("name")
+            else:
+                val = item
+            txt = str(val or "").strip()
+            if txt:
+                names.append(txt)
+    return names
+
+
+def _matches_own_party(desc_upper: str, tx: Dict[str, Any]) -> bool:
+    if not any(k in desc_upper for k in _TRANSFER_KEYWORDS):
+        return False
+    counterparty = _extract_counterparty_name(desc_upper)
+    if not counterparty:
+        return False
+
+    company_candidates = [tx.get("company_name"), tx.get("account_holder")]
+    for name in company_candidates:
+        if _names_match_strict(counterparty, str(name or "")):
+            return True
+    return False
+
+
+def _matches_related_party(desc_upper: str, tx: Dict[str, Any]) -> bool:
+    related_names = _extract_related_party_names(tx)
+    if not related_names:
+        return False
+
+    counterparty = _extract_counterparty_name(desc_upper)
+    if not counterparty:
+        return False
+
+    # C01/C02 priority over C03/C04.
+    if _matches_own_party(desc_upper, tx):
+        return False
+
+    for rp in related_names:
+        if _names_match_strict(counterparty, rp):
+            return True
+    return False
+
+
 @lru_cache(maxsize=1)
 def load_rulebook() -> List[Dict[str, Any]]:
     payload = _safe_read_json(CLASSIFICATION_RULES_FILE)
@@ -186,9 +322,34 @@ def classify_transaction(tx: Dict[str, Any]) -> Dict[str, Any]:
         return {}
 
     for rule in load_rulebook():
+        cat = str(rule.get("cat") or "")
         rule_side = rule.get("side") or ""
         if rule_side and rule_side != tx_side:
             continue
+
+        # Enforce tighter own-party / related-party logic per rulebook.
+        if cat in {"C01", "C02"}:
+            if not _matches_own_party(description, tx):
+                continue
+            return {
+                "rule_category_code": cat,
+                "rule_category_name": rule.get("category"),
+                "rule_schema_field": rule.get("schema_field"),
+                "rule_match_side": tx_side,
+            }
+
+        if cat in {"C03", "C04"}:
+            if cat == "C04" and any(h in description for h in _SALARY_HINTS):
+                # C05 must outrank C04 for salary-tagged transfers.
+                continue
+            if not _matches_related_party(description, tx):
+                continue
+            return {
+                "rule_category_code": cat,
+                "rule_category_name": rule.get("category"),
+                "rule_schema_field": rule.get("schema_field"),
+                "rule_match_side": tx_side,
+            }
 
         regex_patterns: List[Pattern[str]] = rule.get("regex_patterns", [])
         regex_hit = any(p.search(description) for p in regex_patterns)
