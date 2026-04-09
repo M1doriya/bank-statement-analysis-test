@@ -29,7 +29,7 @@ Apply categories in this exact order:
 3. **C05** — Salary (AUTOPAY DR = always salary for CIMB; salary keywords for Maybank individual transfers)
 4. **C03/C04** — Related party (match against related_parties[] list; purpose keyword disambiguates)
 5. **C06-C09** — Statutory payments (EPF/SOCSO/LHDN/HRDF using full Malay names first, then abbreviations)
-6. **C10** — Loan disbursement / factoring (Tier 1: keywords; Tier 2: AI judgment for unknown entities)
+6. **C10** — Loan disbursement / factoring (Tier 1: keywords; Tier 2: deterministic fallback rules for unknown entities)
 7. **C11** — Loan repayment (dual-tag with C02 allowed; C11 is reporting only, C02 handles exclusion)
 8. **C12-C13** — FD/interest income, reversals
 9. **C14-C16** — Returned cheques, IBG/GIRO inward returns
@@ -125,7 +125,52 @@ Extract counterparty names using the rules in counterparty_extraction_rules (CP1
 - Transfer prefix (IBG CREDIT, TR IBG, TRANSFER FR A/C) = payment METHOD, not counterparty
 - Entity name AFTER the prefix = counterparty
 - Cheque patterns (HSE CHQ, 2D LOCAL CHQ, CDM CASH) = Unidentified, NEVER use as top party name
-- Normalisation: simple cleanup (punctuation, case, SDN BHD) is deterministic. Merging truncated names needs AI judgment. Wrong normalisation is worse than duplicates.
+- Normalisation: simple cleanup (punctuation, case, SDN BHD) is deterministic. Merging truncated names must use deterministic thresholds and conservative matching. Wrong normalisation is worse than duplicates.
+
+## FULL-CODE DETERMINISTIC IMPLEMENTATION NOTES
+
+Use the following deterministic logic as implementation guidance for current apps:
+
+- These rules are **company-agnostic** and apply to all companies/accounts.
+- Company names in examples are illustrative only; production logic must use dynamic inputs (`company_name`, `related_parties[]`, known entities, and configurable dictionaries/thresholds).
+
+1. **Name extraction pipeline**
+   - Strip channel prefixes first (IBG/DUITNOW/TRANSFER/PAYMENT/AUTOPAY).
+   - Remove ref tokens (`[A-Z0-9]{3,}`), account/card numbers, and stopwords.
+   - Split Maybank-style strings by `*` into `{name_part, purpose_part}`.
+
+2. **Name normalisation + merge thresholds**
+   - Canonicalise case, punctuation, legal suffixes, and whitespace.
+   - Only merge truncated names when both pass:
+     - token overlap >= 0.80
+     - prefix similarity >= 0.85
+   - If thresholds fail, DO NOT merge; keep separate labels and log for review.
+
+3. **Related-party scoring (for RP3/RP4 style behavior)**
+   - Binary score components:
+     - name match to related-party corpus
+     - recurring frequency >= 3
+     - personal-purpose keyword present
+     - bi-directional flow observed
+   - Score >= 3 => related-party candidate; then classify by side + purpose.
+
+4. **Purpose disambiguation dictionary (deterministic)**
+   - Salary: `SALARY`, `GAJI`, `STAFF SALARY`, `STAFF INCENTIVE`, `STAFF OVERTIME`, `STAFF BONUS`, `STAFF ADVANCE`, `EXTRA SALARY`, `GUARD SALARY`.
+   - Personal obligation: `REPAYMENT`, `INSTALMENT`, `CREDIT CARD`, `HOUSING LOAN`, `PETTY CASH`.
+   - Operational/customer-service: `UMRAH`, `VISA`, `TICKET`, `BOOKING`, `HOTEL`, `INV`.
+   - This dictionary must be configurable by sector; do not hardcode a single-industry vocabulary.
+
+5. **C10 deterministic fallback**
+   - If `LOAN DISB|FINANCING DISB|TRADE FINANCE CR` => C10.
+   - Else if `F ADVANCE|ADVANCE` + known factoring entity => C10.
+   - Else if `ADVANCE` but unknown entity:
+     - mark `C10_CANDIDATE` only if amount >= large-credit threshold AND counterparty recurs >= 2 times in period
+     - otherwise keep as regular income and add review flag.
+
+6. **FX conservative gate**
+   - `TT CREDIT` alone is not FX.
+   - FX requires explicit conversion evidence (currency pair/rate/SWIFT foreign leg).
+   - If evidence absent, keep non-FX and flag for analyst review.
 
 ---
 
