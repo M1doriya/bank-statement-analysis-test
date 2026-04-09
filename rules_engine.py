@@ -4,7 +4,7 @@ import json
 import re
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Pattern
 
 from core_utils import safe_float
 
@@ -43,8 +43,6 @@ def _extract_quoted_tokens(text: str) -> List[str]:
     out: List[str] = []
     for token in re.findall(r"'([^']+)'|\"([^\"]+)\"", text):
         value = (token[0] or token[1] or "").strip()
-        if not value:
-            continue
         if len(value) < 3:
             continue
         out.append(value.upper())
@@ -57,11 +55,71 @@ def _extract_upper_terms(text: str) -> List[str]:
     out: List[str] = []
     for piece in re.split(r"[\n,;/]|\\n", text):
         value = piece.strip().strip("•-*").strip()
-        if not value:
+        if len(value) < 3:
+            continue
+        if "[" in value or "]" in value or "(" in value or ")" in value:
             continue
         if any(ch.isalpha() for ch in value):
             out.append(value.upper())
     return out
+
+
+def _extract_regex_literals(text: str) -> List[str]:
+    r"""Extract literal regex patterns from freeform rulebook cells.
+
+    Accepts lines like:
+    - r"(?:EPF|KWSP)"
+    - CIMB: r"AUTOPAY DR U\d{4}"
+    - re.search(r"(IBG CREDIT|DUITNOW)", desc, re.I)
+    """
+    if not text:
+        return []
+
+    out: List[str] = []
+    # r"..." / r'...'
+    out.extend(m.group(1) for m in re.finditer(r"\br\"((?:\\.|[^\"])*)\"", text))
+    out.extend(m.group(1) for m in re.finditer(r"\br'((?:\\.|[^'])*)'", text))
+
+    # ...re.search(r"...", ...)
+    out.extend(m.group(1) for m in re.finditer(r"re\.search\(\s*r\"((?:\\.|[^\"])*)\"", text))
+    out.extend(m.group(1) for m in re.finditer(r"re\.search\(\s*r'((?:\\.|[^'])*)'", text))
+
+    cleaned: List[str] = []
+    for pat in out:
+        pat = pat.strip()
+        if len(pat) < 3:
+            continue
+        # Skip clearly dynamic/placeholder patterns that cannot be compiled safely.
+        if any(marker in pat for marker in ("{" + "company", "known_factoring_entities", "monthly_eod_avg", "large_credit_threshold")):
+            continue
+        cleaned.append(pat)
+    return cleaned
+
+
+def _compile_patterns(patterns: List[str]) -> List[Pattern[str]]:
+    compiled: List[Pattern[str]] = []
+    for p in patterns:
+        try:
+            compiled.append(re.compile(p, flags=re.IGNORECASE))
+        except re.error:
+            continue
+    return compiled
+
+
+def _description_contains_keyword(description: str, token: str) -> bool:
+    if not token:
+        return False
+    token = token.strip().upper()
+    if not token:
+        return False
+
+    # Strict phrase boundary matching for simple keyword phrases.
+    if re.fullmatch(r"[A-Z0-9 /&.-]+", token):
+        pattern = rf"(?<![A-Z0-9]){re.escape(token)}(?![A-Z0-9])"
+        return re.search(pattern, description) is not None
+
+    # Fallback for uncommon punctuation tokens.
+    return token in description
 
 
 @lru_cache(maxsize=1)
@@ -79,10 +137,13 @@ def load_rulebook() -> List[Dict[str, Any]]:
         if side not in {"CR", "DR"}:
             side = ""
 
+        keyword_patterns = str(row.get("Keyword Patterns", "") or "")
+        regex_source = str(row.get("Regex Pattern (Python)", "") or "")
+
         tokens = []
-        tokens.extend(_extract_quoted_tokens(str(row.get("Keyword Patterns", ""))))
-        tokens.extend(_extract_quoted_tokens(str(row.get("Regex Pattern (Python)", ""))))
-        tokens.extend(_extract_upper_terms(str(row.get("Keyword Patterns", ""))))
+        tokens.extend(_extract_quoted_tokens(keyword_patterns))
+        tokens.extend(_extract_quoted_tokens(regex_source))
+        tokens.extend(_extract_upper_terms(keyword_patterns))
 
         seen = set()
         normalized_tokens: List[str] = []
@@ -95,6 +156,9 @@ def load_rulebook() -> List[Dict[str, Any]]:
             seen.add(t)
             normalized_tokens.append(t)
 
+        regex_patterns = _extract_regex_literals(regex_source)
+        compiled_patterns = _compile_patterns(regex_patterns)
+
         rules.append(
             {
                 "cat": cat,
@@ -105,6 +169,7 @@ def load_rulebook() -> List[Dict[str, Any]]:
                 "priority_rank": _priority_rank(row.get("Priority")),
                 "row_number": int(row.get("_row_number", 0) or 0),
                 "tokens": normalized_tokens[:60],
+                "regex_patterns": compiled_patterns,
             }
         )
 
@@ -124,10 +189,14 @@ def classify_transaction(tx: Dict[str, Any]) -> Dict[str, Any]:
         rule_side = rule.get("side") or ""
         if rule_side and rule_side != tx_side:
             continue
+
+        regex_patterns: List[Pattern[str]] = rule.get("regex_patterns", [])
+        regex_hit = any(p.search(description) for p in regex_patterns)
+
         tokens = rule.get("tokens", [])
-        if not tokens:
-            continue
-        if any(token in description for token in tokens):
+        token_hit = any(_description_contains_keyword(description, token) for token in tokens)
+
+        if regex_hit or token_hit:
             return {
                 "rule_category_code": rule.get("cat"),
                 "rule_category_name": rule.get("category"),
