@@ -67,7 +67,6 @@ from ui_components import (
     toggle_compat,
 )
 from rules_engine import classify_transaction, get_rules_metadata
-from html_parser_adapter import build_analysis_payload, generate_interactive_html
 
 
 def _supports_streamlit_kwarg(func, name: str) -> bool:
@@ -1873,7 +1872,7 @@ if st.session_state.results or (bank_choice == "Affin Bank" and st.session_state
         "Download options",
         "Export transactions only, or generate full JSON and XLSX reports using the same underlying data.",
     )
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3 = st.columns(3)
 
     df_download = df.copy() if not df.empty else pd.DataFrame([])
 
@@ -1930,24 +1929,6 @@ if st.session_state.results or (bank_choice == "Affin Bank" and st.session_state
             output.getvalue(),
             "full_report.xlsx",
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True,
-        )
-
-    with col4:
-        html_payload = build_analysis_payload(
-            df=df_download,
-            monthly_summary=monthly_summary,
-            bank_choice=bank_choice,
-            total_files_processed=total_files_processed,
-            date_min=date_min,
-            date_max=date_max,
-        )
-        html_content = generate_interactive_html(html_payload)
-        download_button_compat(
-            "🌐 Download Interactive Report (HTML)",
-            html_content,
-            "interactive_report.html",
-            "text/html",
             use_container_width=True,
         )
 
