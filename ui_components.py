@@ -82,8 +82,8 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
             --tool-uploader-shell-bg: #ffffff;
             --tool-uploader-shell-border: rgba(15, 23, 42, 0.10);
             --tool-uploader-copy: #475569;
-            --shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
-            --shadow-soft: 0 6px 16px rgba(15, 23, 42, 0.04);
+            --shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+            --shadow-soft: 0 4px 12px rgba(15, 23, 42, 0.035);
             --badge-bg: rgba(18, 184, 171, 0.10);
             --badge-border: rgba(18, 184, 171, 0.20);
             --badge-text: #0d8f85;
@@ -194,8 +194,8 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
             --tool-uploader-shell-bg: #101922;
             --tool-uploader-shell-border: rgba(17, 213, 196, 0.12);
             --tool-uploader-copy: #9db8bb;
-            --shadow: 0 18px 44px rgba(0, 0, 0, 0.28);
-            --shadow-soft: 0 10px 26px rgba(0, 0, 0, 0.18);
+            --shadow: 0 16px 34px rgba(2, 9, 13, 0.24);
+            --shadow-soft: 0 8px 18px rgba(2, 9, 13, 0.14);
             --badge-bg: rgba(17, 213, 196, 0.10);
             --badge-border: rgba(17, 213, 196, 0.20);
             --badge-text: #7ef1e6;
@@ -242,9 +242,7 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
 
         html, body, [data-testid="stAppViewContainer"], [data-testid="stApp"] {{
             background:
-                repeating-linear-gradient(0deg, rgba(17, 213, 196, 0.06) 0, rgba(17, 213, 196, 0.06) 1px, transparent 1px, transparent 42px),
-                repeating-linear-gradient(90deg, rgba(17, 213, 196, 0.05) 0, rgba(17, 213, 196, 0.05) 1px, transparent 1px, transparent 42px),
-                radial-gradient(circle at top center, var(--page-spotlight), transparent 24%),
+                radial-gradient(circle at top center, var(--page-spotlight), transparent 36%),
                 linear-gradient(180deg, var(--page-bg) 0%, var(--page-bg-soft) 100%);
             color: var(--text);
         }}
@@ -253,15 +251,15 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
         #MainMenu, footer {{ visibility: hidden; }}
 
         .block-container {{
-            max-width: 1180px;
-            padding-top: 1rem;
-            padding-bottom: 3rem;
+            max-width: 1120px;
+            padding-top: 0.75rem;
+            padding-bottom: 2.25rem;
         }}
 
         .topbar-shell {{
             background: var(--topbar-bg);
             border: 1px solid var(--topbar-border);
-            border-radius: var(--radius-xl);
+            border-radius: 16px;
             box-shadow: var(--shadow-soft);
         }}
 
@@ -269,27 +267,27 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
         .steps-shell {{
             background: var(--hero-bg);
             border: 1px solid var(--hero-line);
-            border-radius: var(--radius-xl);
+            border-radius: 16px;
             box-shadow: var(--shadow-soft);
         }}
 
         .progress-shell {{
             background: var(--progress-bg);
             border: 1px solid var(--progress-border);
-            border-radius: var(--radius-xl);
+            border-radius: 16px;
             box-shadow: var(--shadow-soft);
         }}
 
         .tool-shell {{
             background: var(--tool-bg);
             border: 1px solid var(--tool-border);
-            border-radius: var(--radius-xl);
+            border-radius: 16px;
             box-shadow: var(--shadow);
         }}
 
         .topbar-shell {{
             padding: 18px 22px;
-            margin-bottom: 1rem;
+            margin-bottom: 0.75rem;
             min-height: 86px;
             display: flex;
             align-items: center;
@@ -309,7 +307,7 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
         }}
 
         div[data-testid="column"]:has(.theme-topbar-anchor) {{
-            margin-bottom: 1rem;
+            margin-bottom: 0.75rem;
         }}
 
         div[data-testid="column"]:has(.theme-topbar-anchor) > div,
@@ -317,7 +315,7 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
         div[data-testid="column"]:has(.theme-topbar-anchor) > div > div > div {{
             background: var(--topbar-bg);
             border: 1px solid var(--topbar-border);
-            border-radius: var(--radius-xl);
+            border-radius: 16px;
             box-shadow: var(--shadow-soft);
             padding: 18px 22px;
             min-height: 86px;
@@ -369,7 +367,7 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
         .theme-toggle-shell {{
             background: var(--theme-card-bg);
             border: 1px solid var(--theme-card-border);
-            border-radius: 18px;
+            border-radius: 14px;
             padding: 12px 14px;
             box-shadow: var(--shadow-soft);
             margin-bottom: 0.55rem;
@@ -395,7 +393,7 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
         .auth-shell {{
             background: var(--auth-bg);
             border: 1px solid var(--line);
-            border-radius: var(--radius-xl);
+            border-radius: 16px;
             box-shadow: var(--shadow);
         }}
 
@@ -527,7 +525,7 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
         }}
 
         .appearance-shell {{
-            margin-bottom: 1rem;
+            margin-bottom: 0.75rem;
             padding: 16px 20px;
             display: flex;
             align-items: center;
@@ -664,7 +662,7 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
 
         .hero-shell {{
             padding: 34px 30px;
-            margin-bottom: 1rem;
+            margin-bottom: 0.75rem;
             text-align: center;
         }}
 
@@ -732,7 +730,7 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            min-height: 46px;
+            min-height: 42px;
             padding: 0 24px;
             border-radius: 12px;
             border: 1px solid var(--tool-border);
@@ -884,8 +882,8 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
             margin: 12px 0 0;
             max-width: 760px;
             color: var(--display-copy);
-            line-height: 1.75;
-            font-size: 0.97rem;
+            line-height: 1.6;
+            font-size: 0.94rem;
         }}
 
         .workspace-grid {{
@@ -992,7 +990,7 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
         .tool-card {{
             border: 1px solid var(--line);
             background: var(--surface);
-            border-radius: 18px;
+            border-radius: 14px;
             padding: 14px 16px;
             margin: 0 0 0.55rem;
             box-shadow: var(--shadow-soft);
@@ -1062,7 +1060,7 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
             gap: 14px;
-            margin-bottom: 1rem;
+            margin-bottom: 0.75rem;
         }}
 
         .metric-card {{
@@ -1095,10 +1093,10 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
             justify-content: space-between;
             gap: 16px;
             padding: 16px 18px;
-            border-radius: 18px;
+            border-radius: 14px;
             border: 1px solid var(--line);
             background: var(--surface);
-            margin-bottom: 1rem;
+            margin-bottom: 0.75rem;
         }}
 
         .status-card__group {{
@@ -1170,7 +1168,7 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
         .results-shell,
         .download-shell {{
             padding: 18px;
-            margin-bottom: 1rem;
+            margin-bottom: 0.75rem;
         }}
 
         .section-head {{
@@ -1180,7 +1178,7 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
             padding: 16px 18px;
             margin: 0 0 14px;
             border: 1px solid var(--line);
-            border-radius: 18px;
+            border-radius: 14px;
             background: var(--surface);
             box-shadow: var(--shadow-soft);
         }}
@@ -1222,7 +1220,7 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
         .auth-copy {{
             margin: 12px 0 0;
             color: var(--auth-copy);
-            line-height: 1.75;
+            line-height: 1.6;
             font-size: 0.98rem;
         }}
 
@@ -1240,7 +1238,7 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
             padding: 20px 18px 18px;
             margin: 1rem auto 0;
             max-width: 760px;
-            border-radius: 22px;
+            border-radius: 16px;
         }}
 
         div[data-testid="stWidgetLabel"] p,
@@ -1277,7 +1275,7 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
 
         div[data-baseweb="input"] > div,
         div[data-baseweb="select"] > div {{
-            min-height: 52px;
+            min-height: 42px;
             border: 1px solid var(--input-border);
             background: var(--input-bg);
             box-shadow: none;
@@ -1330,7 +1328,7 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
         div[data-testid="stTextInput"],
         div[data-testid="stTextArea"],
         div[data-testid="stFileUploader"] {{
-            margin-bottom: 1rem;
+            margin-bottom: 0.75rem;
         }}
 
         div[data-baseweb="select"] > div,
@@ -1444,7 +1442,7 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
         div[data-testid="stFileUploader"] > section {{
             background: var(--surface);
             border: 1px solid var(--line);
-            border-radius: 18px;
+            border-radius: 14px;
             padding: 14px 16px;
             box-shadow: var(--shadow-soft);
         }}
@@ -1501,7 +1499,7 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
         div.stButton > button,
         div.stDownloadButton > button,
         div[data-testid="stFormSubmitButton"] > button {{
-            min-height: 46px;
+            min-height: 42px;
             border-radius: 12px;
             font-weight: 700;
             border: 1px solid var(--line-strong);
