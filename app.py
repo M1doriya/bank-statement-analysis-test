@@ -66,7 +66,7 @@ from ui_components import (
     render_top_bar,
     toggle_compat,
 )
-from rules_engine import classify_transaction, get_rules_metadata
+from rules_engine import classify_transaction, extract_transfer_counterparty, get_rules_metadata
 from schema_output import build_schema_report, validate_schema_report
 
 
@@ -189,6 +189,15 @@ if "file_company_name" not in st.session_state:
 if "file_account_no" not in st.session_state:
     st.session_state.file_account_no = {}
 
+if "manual_own_parties" not in st.session_state:
+    st.session_state.manual_own_parties = ""
+
+if "manual_related_parties" not in st.session_state:
+    st.session_state.manual_related_parties = ""
+
+if "manual_related_party_selection" not in st.session_state:
+    st.session_state.manual_related_party_selection = []
+
 
 _ISO_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
@@ -207,6 +216,15 @@ def parse_any_date_for_summary(x) -> pd.Timestamp:
 def _parse_with_pdfplumber(parser_func: Callable, pdf_bytes: bytes, filename: str) -> List[dict]:
     with bytes_to_pdfplumber(pdf_bytes) as pdf:
         return parser_func(pdf, filename)
+
+
+def _parse_party_text(value: str) -> List[str]:
+    out: List[str] = []
+    for item in re.split(r"[,;\n]+", str(value or "")):
+        txt = item.strip()
+        if txt and txt not in out:
+            out.append(txt)
+    return out
 
 
 # -----------------------------
@@ -1059,6 +1077,16 @@ with workspace_right:
     apply_rules_v3 = toggle_compat("Apply rules classification to output", key="apply_rules_v3", value=False)
     if apply_rules_v3:
         st.caption("Rule tags will be added to the transaction table and export files.")
+        st.text_area(
+            "Own party aliases (optional, comma/newline separated)",
+            key="manual_own_parties",
+            help="Use this to force specific names to be treated as own-party (C01/C02).",
+        )
+        st.text_area(
+            "Related party names (optional, comma/newline separated)",
+            key="manual_related_parties",
+            help="Use this to force specific names to be treated as related-party (C03/C04).",
+        )
         with st.expander("Loaded rules metadata", expanded=False):
             st.json(get_rules_metadata())
     close_tool_card()
@@ -1081,6 +1109,7 @@ with workspace_right:
             st.session_state.bank_islam_file_month = {}
             st.session_state.file_company_name = {}
             st.session_state.file_account_no = {}
+            st.session_state.manual_related_party_selection = []
 
     with col2:
         if button_compat("Stop", use_container_width=True):
@@ -1105,6 +1134,9 @@ with workspace_right:
             st.session_state.file_account_no = {}
             st.session_state.pdf_password = ""
             st.session_state.company_name_override = ""
+            st.session_state.manual_own_parties = ""
+            st.session_state.manual_related_parties = ""
+            st.session_state.manual_related_party_selection = []
             st.rerun()
 
     render_status_card(st.session_state.status)
@@ -1781,9 +1813,30 @@ if st.session_state.results or (bank_choice == "Affin Bank" and st.session_state
     df = pd.DataFrame(st.session_state.results) if st.session_state.results else pd.DataFrame()
 
     apply_rules_v3 = bool(st.session_state.get("apply_rules_v3", False))
+    manual_own = _parse_party_text(st.session_state.get("manual_own_parties", ""))
+    manual_related = _parse_party_text(st.session_state.get("manual_related_parties", ""))
+    if apply_rules_v3 and not df.empty and "description" in df.columns:
+        candidate_parties: List[str] = []
+        for desc in df["description"].dropna().astype(str).tolist():
+            candidate = extract_transfer_counterparty(desc.upper())
+            if candidate and candidate not in candidate_parties:
+                candidate_parties.append(candidate)
+        if candidate_parties:
+            st.session_state.manual_related_party_selection = st.multiselect(
+                "Quick-select related parties from detected transfer counterparties",
+                options=sorted(candidate_parties),
+                default=[x for x in st.session_state.get("manual_related_party_selection", []) if x in candidate_parties],
+                help="Selections are added to related-party classification for this run.",
+            )
+            for party in st.session_state.manual_related_party_selection:
+                if party not in manual_related:
+                    manual_related.append(party)
+
     if apply_rules_v3 and not df.empty:
         records = df.to_dict(orient="records")
         for row in records:
+            row["manual_own_parties"] = manual_own
+            row["manual_related_parties"] = manual_related
             row.update(classify_transaction(row))
         df = pd.DataFrame(records)
 

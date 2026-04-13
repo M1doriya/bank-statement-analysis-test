@@ -175,7 +175,7 @@ def _normalize_entity_name(value: Any) -> str:
     return " ".join(parts)
 
 
-def _extract_counterparty_name(description: str) -> str:
+def extract_transfer_counterparty(description: str) -> str:
     if not description:
         return ""
     head = description.split("*")[0]
@@ -203,9 +203,10 @@ def _names_match_strict(left: str, right: str) -> bool:
     if left_n == right_n:
         return True
 
-    # Allow conservative truncation tolerance for long legal names while
-    # preventing short-root false positives (e.g., DMC TRAVEL vs DMC CONSTRUCTION).
-    if len(left_n) >= 12 and len(right_n) >= 12:
+    # Conservative truncation tolerance only when at least one side has 3+ tokens.
+    left_tokens = left_n.split()
+    right_tokens = right_n.split()
+    if len(left_n) >= 15 and len(right_n) >= 15 and (len(left_tokens) >= 3 or len(right_tokens) >= 3):
         return left_n.startswith(right_n) or right_n.startswith(left_n)
     return False
 
@@ -225,14 +226,36 @@ def _extract_related_party_names(tx: Dict[str, Any]) -> List[str]:
     return names
 
 
+def _extract_manual_party_names(tx: Dict[str, Any], key: str) -> List[str]:
+    names: List[str] = []
+    raw = tx.get(key)
+    if isinstance(raw, list):
+        for item in raw:
+            txt = str(item or "").strip()
+            if txt:
+                names.append(txt)
+    elif isinstance(raw, str):
+        for item in re.split(r"[,;\n]+", raw):
+            txt = item.strip()
+            if txt:
+                names.append(txt)
+    return names
+
+
 def _matches_own_party(desc_upper: str, tx: Dict[str, Any]) -> bool:
     if not any(k in desc_upper for k in _TRANSFER_KEYWORDS):
         return False
-    counterparty = _extract_counterparty_name(desc_upper)
+    counterparty = extract_transfer_counterparty(desc_upper)
     if not counterparty:
         return False
 
+    manual_related = _extract_manual_party_names(tx, "manual_related_parties")
+    for rp in manual_related:
+        if _names_match_strict(counterparty, rp):
+            return False
+
     company_candidates = [tx.get("company_name"), tx.get("account_holder")]
+    company_candidates.extend(_extract_manual_party_names(tx, "manual_own_parties"))
     for name in company_candidates:
         if _names_match_strict(counterparty, str(name or "")):
             return True
@@ -241,10 +264,11 @@ def _matches_own_party(desc_upper: str, tx: Dict[str, Any]) -> bool:
 
 def _matches_related_party(desc_upper: str, tx: Dict[str, Any]) -> bool:
     related_names = _extract_related_party_names(tx)
+    related_names.extend(_extract_manual_party_names(tx, "manual_related_parties"))
     if not related_names:
         return False
 
-    counterparty = _extract_counterparty_name(desc_upper)
+    counterparty = extract_transfer_counterparty(desc_upper)
     if not counterparty:
         return False
 
@@ -329,6 +353,8 @@ def classify_transaction(tx: Dict[str, Any]) -> Dict[str, Any]:
 
         # Enforce tighter own-party / related-party logic per rulebook.
         if cat in {"C01", "C02"}:
+            if _matches_related_party(description, tx):
+                continue
             if not _matches_own_party(description, tx):
                 continue
             return {

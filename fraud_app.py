@@ -62,10 +62,14 @@ display_cols = [c for c in preferred_cols if c in df.columns] or list(df.columns
 st.sidebar.markdown("---")
 enable_rules = st.sidebar.toggle("Apply v3 rules", value=False)
 if enable_rules:
+    manual_own = st.sidebar.text_area("Own party aliases", help="Comma/newline separated names.")
+    manual_related = st.sidebar.text_area("Related party names", help="Comma/newline separated names.")
     enriched: List[Dict] = []
     for tx in transactions:
         row = dict(tx)
-        row.update(classify_transaction(tx))
+        row["manual_own_parties"] = manual_own
+        row["manual_related_parties"] = manual_related
+        row.update(classify_transaction(row))
         enriched.append(row)
     transactions = enriched
     df = pd.DataFrame(transactions)
