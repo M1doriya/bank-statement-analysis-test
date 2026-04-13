@@ -197,6 +197,8 @@ if "manual_related_parties" not in st.session_state:
 
 if "manual_related_party_selection" not in st.session_state:
     st.session_state.manual_related_party_selection = []
+if "manual_own_party_selection" not in st.session_state:
+    st.session_state.manual_own_party_selection = []
 
 
 _ISO_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -220,9 +222,24 @@ def _parse_with_pdfplumber(parser_func: Callable, pdf_bytes: bytes, filename: st
 
 def _parse_party_text(value: str) -> List[str]:
     out: List[str] = []
+    seen: set[str] = set()
     for item in re.split(r"[,;\n]+", str(value or "")):
         txt = item.strip()
-        if txt and txt not in out:
+        key = re.sub(r"\s+", " ", txt).strip().upper()
+        if txt and key and key not in seen:
+            seen.add(key)
+            out.append(txt)
+    return out
+
+
+def _dedupe_party_names(values: List[str]) -> List[str]:
+    out: List[str] = []
+    seen: set[str] = set()
+    for val in values:
+        txt = str(val or "").strip()
+        key = re.sub(r"\s+", " ", txt).strip().upper()
+        if txt and key and key not in seen:
+            seen.add(key)
             out.append(txt)
     return out
 
@@ -1110,6 +1127,7 @@ with workspace_right:
             st.session_state.file_company_name = {}
             st.session_state.file_account_no = {}
             st.session_state.manual_related_party_selection = []
+            st.session_state.manual_own_party_selection = []
 
     with col2:
         if button_compat("Stop", use_container_width=True):
@@ -1137,6 +1155,7 @@ with workspace_right:
             st.session_state.manual_own_parties = ""
             st.session_state.manual_related_parties = ""
             st.session_state.manual_related_party_selection = []
+            st.session_state.manual_own_party_selection = []
             st.rerun()
 
     render_status_card(st.session_state.status)
@@ -1819,18 +1838,30 @@ if st.session_state.results or (bank_choice == "Affin Bank" and st.session_state
         candidate_parties: List[str] = []
         for desc in df["description"].dropna().astype(str).tolist():
             candidate = extract_transfer_counterparty(desc.upper())
-            if candidate and candidate not in candidate_parties:
+            if candidate:
                 candidate_parties.append(candidate)
+        candidate_parties = sorted(_dedupe_party_names(candidate_parties))
         if candidate_parties:
+            current_own = _dedupe_party_names(manual_own + st.session_state.get("manual_own_party_selection", []))
+            current_related = _dedupe_party_names(manual_related + st.session_state.get("manual_related_party_selection", []))
+
+            own_defaults = [x for x in current_own if re.sub(r"\s+", " ", x).strip().upper() in {c.upper() for c in candidate_parties}]
+            related_defaults = [x for x in current_related if re.sub(r"\s+", " ", x).strip().upper() in {c.upper() for c in candidate_parties}]
+
+            st.session_state.manual_own_party_selection = st.multiselect(
+                "Quick-select OWN parties from detected transfer counterparties",
+                options=candidate_parties,
+                default=own_defaults,
+                help="Selections are categorized as own-party (C01/C02).",
+            )
             st.session_state.manual_related_party_selection = st.multiselect(
                 "Quick-select related parties from detected transfer counterparties",
-                options=sorted(candidate_parties),
-                default=[x for x in st.session_state.get("manual_related_party_selection", []) if x in candidate_parties],
-                help="Selections are added to related-party classification for this run.",
+                options=candidate_parties,
+                default=related_defaults,
+                help="Selections are categorized as related-party (C03/C04).",
             )
-            for party in st.session_state.manual_related_party_selection:
-                if party not in manual_related:
-                    manual_related.append(party)
+            manual_own = _dedupe_party_names(manual_own + st.session_state.manual_own_party_selection)
+            manual_related = _dedupe_party_names(manual_related + st.session_state.manual_related_party_selection)
 
     if apply_rules_v3 and not df.empty:
         records = df.to_dict(orient="records")
