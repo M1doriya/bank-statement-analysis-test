@@ -1845,21 +1845,77 @@ if st.session_state.results or (bank_choice == "Affin Bank" and st.session_state
             current_own = _dedupe_party_names(manual_own + st.session_state.get("manual_own_party_selection", []))
             current_related = _dedupe_party_names(manual_related + st.session_state.get("manual_related_party_selection", []))
 
-            own_defaults = [x for x in current_own if re.sub(r"\s+", " ", x).strip().upper() in {c.upper() for c in candidate_parties}]
-            related_defaults = [x for x in current_related if re.sub(r"\s+", " ", x).strip().upper() in {c.upper() for c in candidate_parties}]
+            normalized_candidates = {re.sub(r"\s+", " ", c).strip().upper() for c in candidate_parties}
+            own_defaults = [x for x in current_own if re.sub(r"\s+", " ", x).strip().upper() in normalized_candidates]
+            related_defaults = [x for x in current_related if re.sub(r"\s+", " ", x).strip().upper() in normalized_candidates]
 
-            st.session_state.manual_own_party_selection = st.multiselect(
-                "Quick-select OWN parties from detected transfer counterparties",
-                options=candidate_parties,
-                default=own_defaults,
-                help="Selections are categorized as own-party (C01/C02).",
-            )
-            st.session_state.manual_related_party_selection = st.multiselect(
-                "Quick-select related parties from detected transfer counterparties",
-                options=candidate_parties,
-                default=related_defaults,
-                help="Selections are categorized as related-party (C03/C04).",
-            )
+            st.caption(f"Detected transfer counterparties: {len(candidate_parties)}")
+            own_col, related_col = columns_compat([1, 1], gap="large")
+
+            with own_col:
+                own_filter = st.text_input(
+                    "Search own-party list",
+                    placeholder="Type to filter candidate names...",
+                    key="manual_own_party_filter",
+                )
+                own_filter_lower = own_filter.strip().lower()
+                own_filtered = [p for p in candidate_parties if own_filter_lower in p.lower()]
+                own_current = st.session_state.get("manual_own_party_selection", own_defaults)
+                own_options = own_filtered + [x for x in own_current if x not in own_filtered]
+                st.session_state.manual_own_party_selection = st.multiselect(
+                    "Quick-select OWN parties from detected transfer counterparties",
+                    options=own_options,
+                    default=[x for x in own_defaults if x in own_options],
+                    help="Selections are categorized as own-party (C01/C02).",
+                    key="manual_own_party_multiselect",
+                )
+                own_action_col1, own_action_col2 = columns_compat(2, gap="small")
+                with own_action_col1:
+                    if button_compat("Select filtered", key="manual_own_select_filtered", use_container_width=True):
+                        st.session_state.manual_own_party_selection = _dedupe_party_names(
+                            st.session_state.manual_own_party_selection + own_filtered
+                        )
+                with own_action_col2:
+                    if button_compat("Clear own", key="manual_own_clear_all", use_container_width=True):
+                        st.session_state.manual_own_party_selection = []
+                st.caption(f"Selected own parties: {len(st.session_state.manual_own_party_selection)}")
+
+            with related_col:
+                related_filter = st.text_input(
+                    "Search related-party list",
+                    placeholder="Type to filter candidate names...",
+                    key="manual_related_party_filter",
+                )
+                related_filter_lower = related_filter.strip().lower()
+                related_filtered = [p for p in candidate_parties if related_filter_lower in p.lower()]
+                related_current = st.session_state.get("manual_related_party_selection", related_defaults)
+                related_options = related_filtered + [x for x in related_current if x not in related_filtered]
+                st.session_state.manual_related_party_selection = st.multiselect(
+                    "Quick-select related parties from detected transfer counterparties",
+                    options=related_options,
+                    default=[x for x in related_defaults if x in related_options],
+                    help="Selections are categorized as related-party (C03/C04).",
+                    key="manual_related_party_multiselect",
+                )
+                related_action_col1, related_action_col2 = columns_compat(2, gap="small")
+                with related_action_col1:
+                    if button_compat(
+                        "Select filtered",
+                        key="manual_related_select_filtered",
+                        use_container_width=True,
+                    ):
+                        st.session_state.manual_related_party_selection = _dedupe_party_names(
+                            st.session_state.manual_related_party_selection + related_filtered
+                        )
+                with related_action_col2:
+                    if button_compat(
+                        "Clear related",
+                        key="manual_related_clear_all",
+                        use_container_width=True,
+                    ):
+                        st.session_state.manual_related_party_selection = []
+                st.caption(f"Selected related parties: {len(st.session_state.manual_related_party_selection)}")
+
             manual_own = _dedupe_party_names(manual_own + st.session_state.manual_own_party_selection)
             manual_related = _dedupe_party_names(manual_related + st.session_state.manual_related_party_selection)
 
