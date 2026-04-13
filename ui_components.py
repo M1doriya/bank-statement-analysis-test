@@ -82,8 +82,8 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
             --tool-uploader-shell-bg: #ffffff;
             --tool-uploader-shell-border: rgba(15, 23, 42, 0.10);
             --tool-uploader-copy: #475569;
-            --shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
-            --shadow-soft: 0 6px 16px rgba(15, 23, 42, 0.04);
+            --shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+            --shadow-soft: 0 4px 12px rgba(15, 23, 42, 0.035);
             --badge-bg: rgba(18, 184, 171, 0.10);
             --badge-border: rgba(18, 184, 171, 0.20);
             --badge-text: #0d8f85;
@@ -194,8 +194,8 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
             --tool-uploader-shell-bg: #101922;
             --tool-uploader-shell-border: rgba(17, 213, 196, 0.12);
             --tool-uploader-copy: #9db8bb;
-            --shadow: 0 18px 44px rgba(0, 0, 0, 0.28);
-            --shadow-soft: 0 10px 26px rgba(0, 0, 0, 0.18);
+            --shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+            --shadow-soft: 0 6px 16px rgba(0, 0, 0, 0.16);
             --badge-bg: rgba(17, 213, 196, 0.10);
             --badge-border: rgba(17, 213, 196, 0.20);
             --badge-text: #7ef1e6;
@@ -235,15 +235,13 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
     <style>
         :root {{
 {theme_vars}
-            --radius-xl: 24px;
-            --radius-lg: 18px;
-            --radius-md: 14px;
+            --radius-xl: 18px;
+            --radius-lg: 14px;
+            --radius-md: 10px;
         }}
 
         html, body, [data-testid="stAppViewContainer"], [data-testid="stApp"] {{
             background:
-                repeating-linear-gradient(0deg, rgba(17, 213, 196, 0.06) 0, rgba(17, 213, 196, 0.06) 1px, transparent 1px, transparent 42px),
-                repeating-linear-gradient(90deg, rgba(17, 213, 196, 0.05) 0, rgba(17, 213, 196, 0.05) 1px, transparent 1px, transparent 42px),
                 radial-gradient(circle at top center, var(--page-spotlight), transparent 24%),
                 linear-gradient(180deg, var(--page-bg) 0%, var(--page-bg-soft) 100%);
             color: var(--text);
@@ -254,8 +252,8 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
 
         .block-container {{
             max-width: 1180px;
-            padding-top: 1rem;
-            padding-bottom: 3rem;
+            padding-top: 0.75rem;
+            padding-bottom: 2.25rem;
         }}
 
         .topbar-shell {{
@@ -263,6 +261,7 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
             border: 1px solid var(--topbar-border);
             border-radius: var(--radius-xl);
             box-shadow: var(--shadow-soft);
+            backdrop-filter: blur(4px);
         }}
 
         .hero-shell,
@@ -271,6 +270,7 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
             border: 1px solid var(--hero-line);
             border-radius: var(--radius-xl);
             box-shadow: var(--shadow-soft);
+            backdrop-filter: blur(4px);
         }}
 
         .progress-shell {{
@@ -278,6 +278,7 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
             border: 1px solid var(--progress-border);
             border-radius: var(--radius-xl);
             box-shadow: var(--shadow-soft);
+            backdrop-filter: blur(4px);
         }}
 
         .tool-shell {{
@@ -285,12 +286,13 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
             border: 1px solid var(--tool-border);
             border-radius: var(--radius-xl);
             box-shadow: var(--shadow);
+            backdrop-filter: blur(4px);
         }}
 
         .topbar-shell {{
-            padding: 18px 22px;
-            margin-bottom: 1rem;
-            min-height: 86px;
+            padding: 14px 18px;
+            margin-bottom: 0.75rem;
+            min-height: 74px;
             display: flex;
             align-items: center;
         }}
@@ -319,8 +321,8 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
             border: 1px solid var(--topbar-border);
             border-radius: var(--radius-xl);
             box-shadow: var(--shadow-soft);
-            padding: 18px 22px;
-            min-height: 86px;
+            padding: 14px 18px;
+            min-height: 74px;
             box-sizing: border-box;
             display: flex;
             align-items: center;
@@ -1501,13 +1503,14 @@ def inject_global_styles(theme_mode: str = "Dark") -> None:
         div.stButton > button,
         div.stDownloadButton > button,
         div[data-testid="stFormSubmitButton"] > button {{
-            min-height: 46px;
-            border-radius: 12px;
+            min-height: 42px;
+            border-radius: 10px;
             font-weight: 700;
             border: 1px solid var(--line-strong);
             background: var(--surface);
             color: var(--text-strong);
-            box-shadow: var(--shadow-soft);
+            box-shadow: none;
+            transition: all 0.2s ease;
         }}
 
         .tool-shell div.stButton > button,
